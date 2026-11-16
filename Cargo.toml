@@ -8,8 +8,8 @@ edition      = "2024"
 homepage     = "https://ret.sh.cn/"
 publish      = true
 repository   = "https://github.com/ret2shell/ret2shell"
-rust-version = "1.95.0"
-version      = "3.12.0"
+rust-version = "1.98.1"
+version      = "3.12.2"
 
 [profile.release]
 codegen-units = 1
@@ -46,7 +46,7 @@ nanoid             = "0.5"
 num-derive         = "0.5"
 num-traits         = "0.2"
 once_cell          = "1.21"
-owo-colors         = "4.3"
+owo-colors         = "4.4"
 rand               = "0.10"
 regex              = "1.13"
 ret2script         = { version = "1.8", default-features = false }
@@ -64,7 +64,7 @@ serde_repr         = "0.1"
 systemstat         = { version = "0.2", features = ["serde"] }
 tar                = "0.4"
 thiserror          = "2.0"
-tokio              = { version = "1.53", features = ["full"] }
+tokio              = { version = "1.54", features = ["full"] }
 tokio-stream       = "0.1"
 tokio-util         = { version = "0.7", features = ["codec"] }
 toml               = "1.1"
@@ -99,7 +99,7 @@ version  = "0.8"
 [workspace.dependencies.jsonwebtoken]
 default-features = false
 features         = ["aws_lc_rs"]
-version          = "11.0"
+version          = "11.1"
 
 [workspace.dependencies.tower_governor]
 default-features = false
@@ -145,7 +145,7 @@ version = "0.11"
 
 [workspace.dependencies.redis]
 features = ["tokio-rustls-comp", "connection-manager"]
-version  = "1.4"
+version  = "1.7"
 
 [workspace.dependencies.kube]
 features = ["config", "client", "rustls-tls", "runtime", "derive", "ws"]

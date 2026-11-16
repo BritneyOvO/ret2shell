@@ -435,7 +435,8 @@ async fn send_email(
       subject,
       content: body.replace("%LINK%", &link).replace("%USER%", account),
     },
-    // unwrap is safe here because we have checked the config in the previous if statement
+    // unwrap is safe here because we have checked the config in the previous if
+    // statement
     config: config.email.as_ref().unwrap().to_owned(),
     email_type,
   };

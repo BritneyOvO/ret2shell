@@ -84,6 +84,7 @@ struct SyncOutcome {
   challenge_ids: BTreeSet<i64>,
   scoreboard_updates: Vec<challenge::Model>,
   milestones_changed: bool,
+  blood_rates_changed: bool,
 }
 
 #[derive(Default)]
@@ -419,13 +420,32 @@ async fn execute_post_receive(
       .queue
       .publish(
         crate::worker::game::SCOREBOARD_TOPIC,
-        crate::worker::game::ScoreMaintenance::Game { game_id: game.id },
+        crate::worker::game::ScoreMaintenance::game(game.id),
         &session.trace_id,
       )
       .await
     {
       logger
         .error(format!("failed to publish the rescore request: {err}"))
+        .await;
+    }
+  } else if outcome.blood_rates_changed {
+    logger
+      .info("Refreshing blood rewards after rate changes...")
+      .await;
+    if let Err(err) = state
+      .queue
+      .publish(
+        crate::worker::game::SCOREBOARD_TOPIC,
+        crate::worker::game::ScoreMaintenance::blood_rates(game.id),
+        &session.trace_id,
+      )
+      .await
+    {
+      logger
+        .error(format!(
+          "failed to publish the blood rate rescore request: {err}"
+        ))
         .await;
     }
   }
@@ -490,7 +510,11 @@ async fn synchronize_repository(
   let mut current_game = game.clone();
   if game_config_changed {
     logger.info("Synchronizing game config...").await;
+    let previous_award_rate = current_game.award_rate;
+    let previous_award_rates = current_game.award_rates.clone();
     current_game = sync_game_config(txn, &current_game, game_bucket).await?;
+    outcome.blood_rates_changed = current_game.award_rate != previous_award_rate
+      || current_game.award_rates != previous_award_rates;
     outcome.invalidate_game = true;
   }
   if doc_changed {
@@ -632,6 +656,16 @@ async fn sync_game_config(
   txn: &DatabaseTransaction, game: &game::Model, game_bucket: &GameBucket,
 ) -> Result<game::Model, SyncError> {
   let bucket_config = game_bucket.config().await?;
+  let config_host_type = bucket_config.host_type;
+  let host_type = convert_game_host_type(config_host_type.clone())?;
+  if host_type != game.host_type {
+    return Err(SyncError::PushRejected(format!(
+      "config.toml sets host_type = {}, but the target game requires host_type = {}; \
+       changing host_type through the repository is not supported",
+      config_host_type as i32,
+      game.host_type.clone() as i32,
+    )));
+  }
   Ok(
     game::update(
       txn,
@@ -648,7 +682,7 @@ async fn sync_game_config(
         hidden: game.hidden,
         offline: game.offline,
         frozen: game.frozen,
-        host_type: convert_game_host_type(bucket_config.host_type)?,
+        host_type,
         team_size: bucket_config.team_size,
         env_limit: bucket_config.env_limit.filter(|&v| v > 0),
         access_policy: game::AccessPolicy {
