@@ -173,6 +173,24 @@ spec:
         - name: platform
           image: {{ include "ret2shell.image" .Values.platform.image }}
           imagePullPolicy: {{ .Values.platform.image.pullPolicy }}
+          {{- with .Values.platform.attachmentOss }}
+          {{- if .bucket }}
+          env:
+            - name: R2S_OSS_BUCKET
+              value: {{ .bucket | quote }}
+            - name: R2S_OSS_ENDPOINT
+              value: {{ required "platform.attachmentOss.endpoint is required when OSS is enabled" .endpoint | quote }}
+            {{- if .publicEndpoint }}
+            - name: R2S_OSS_PUBLIC_ENDPOINT
+              value: {{ .publicEndpoint | quote }}
+            {{- end }}
+          {{- if .credentialsSecret }}
+          envFrom:
+            - secretRef:
+                name: {{ .credentialsSecret | quote }}
+          {{- end }}
+          {{- end }}
+          {{- end }}
           ports:
             - name: http
               containerPort: {{ .Values.platform.service.port }}

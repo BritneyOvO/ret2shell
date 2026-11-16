@@ -24,6 +24,11 @@ platform:
   affinity: {}
   extraVolumes: []
   extraVolumeMounts: []
+  attachmentOss:
+    bucket: ""
+    endpoint: ""
+    publicEndpoint: ""
+    credentialsSecret: ""
   serviceAccount:
     create: true
     name: ""

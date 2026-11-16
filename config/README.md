@@ -24,4 +24,6 @@ Optional environment variables for the server process:
 
 The server scans committed static and mapped challenge files every 60 seconds and uploads missing Git blob versions under `ret2shell/attachments/`. Grant the server permission to read and write this prefix and keep the bucket private. Existing downloads fall back to the application server while a file is not yet synced or OSS is unavailable. Browser download links expire after five minutes. Checker attachments remain local.
 
+For Helm deployments, set `platform.attachmentOss.bucket`, `endpoint`, and optionally `publicEndpoint`. Set `credentialsSecret` to an existing Kubernetes Secret containing the Alibaba Cloud credential environment variables above, or use an available workload identity.
+
 Objects from older file versions are not automatically deleted. Configure an OSS lifecycle rule appropriate to the bucket; active objects removed by the rule are uploaded again on a subsequent scan. Lifecycle expiration must allow for the five-minute download URL lifetime and any downloads already in progress. OSS storage, requests, and outbound traffic incur charges.
