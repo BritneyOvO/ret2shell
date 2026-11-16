@@ -1,5 +1,9 @@
 import { api_root, inflyClient } from "@api";
-import { useChallengeAttachments, useDeleteChallengeAttachmentMutation } from "@api/challenge";
+import {
+  getChallengeAttachmentDownloadUrl,
+  useChallengeAttachments,
+  useDeleteChallengeAttachmentMutation,
+} from "@api/challenge";
 import DownloadButton from "@blocks/download-button";
 import UploadButton from "@blocks/upload-button";
 import { t } from "@storage/theme";
@@ -125,6 +129,9 @@ export default function (props: ChallengeWidgetProps) {
                     square
                     url={`${api_root}/game/${props.gameId}/challenge/${props.challengeId}/file`}
                     searchParams={{ file: file.file, folder: file.folder }}
+                    resolveUrl={() =>
+                      getChallengeAttachmentDownloadUrl(props.gameId, props.challengeId, file.file, file.folder)
+                    }
                   />
                   <Button
                     size="sm"

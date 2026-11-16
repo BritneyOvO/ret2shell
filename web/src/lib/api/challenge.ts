@@ -383,6 +383,20 @@ export async function getChallengeAttachments(
     .json<{ folder: "static" | "mapped" | "checker"; file: string }[]>();
 }
 
+export async function getChallengeAttachmentDownloadUrl(
+  game_id: number,
+  challenge_id: number,
+  file: string,
+  folder: string
+) {
+  const result = await api
+    .get(`${api_root}/game/${game_id}/challenge/${challenge_id}/file`, {
+      searchParams: { file, folder, url: "true" },
+    })
+    .json<{ url: string | null }>();
+  return result.url;
+}
+
 export function useChallengeAttachments({
   game_id,
   challenge_id,

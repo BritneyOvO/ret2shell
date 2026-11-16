@@ -1,5 +1,6 @@
 import { api_root } from "@api";
 import {
+  getChallengeAttachmentDownloadUrl,
   useChallenge,
   useChallengeAttachments,
   useChallengeEnv,
@@ -280,6 +281,9 @@ export default function (props: ChallengeWidgetProps) {
                       icon="icon-[fluent--arrow-download-20-regular]"
                       url={`${api_root}/game/${challenge.data!.game_id}/challenge/${challenge.data!.id}/file`}
                       searchParams={{ file: file.file, folder: file.folder }}
+                      resolveUrl={() =>
+                        getChallengeAttachmentDownloadUrl(props.gameId, props.challengeId, file.file, file.folder)
+                      }
                       disabled={gating.gated()}
                     />
                   )}

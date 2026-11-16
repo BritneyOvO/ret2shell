@@ -17,6 +17,7 @@ export default function DownloadButton(
     withFileName?: boolean;
     displayName?: string;
     searchParams?: { [key: string]: string };
+    resolveUrl?: () => Promise<string | null>;
   }
 ) {
   const [downloadProps, btnProps] = splitProps(props, [
@@ -26,6 +27,7 @@ export default function DownloadButton(
     "searchParams",
     "withFileName",
     "displayName",
+    "resolveUrl",
   ]);
   const [downloading, setDownloading] = createSignal(false);
   const [downloadComplete, setDownloadComplete] = createSignal(false);
@@ -34,6 +36,13 @@ export default function DownloadButton(
   async function handleDownload() {
     setDownloading(true);
     try {
+      const directUrl = await downloadProps.resolveUrl?.();
+      if (directUrl) {
+        const a = document.createElement("a");
+        a.href = directUrl;
+        a.click();
+        return;
+      }
       const blob = await downloadFile(downloadProps.url, downloadProps.searchParams, (progress) => {
         setProgress(progress);
       });
@@ -44,15 +53,16 @@ export default function DownloadButton(
       a.type = blob.type;
       a.click();
       window.URL.revokeObjectURL(url);
+      setDownloadComplete(true);
     } catch (err) {
       handleHttpError(err as Error, t("general.actions.save.status.fail"));
+    } finally {
+      setDownloading(false);
+      setTimeout(() => {
+        setDownloadComplete(false);
+        setProgress(null);
+      }, 2000);
     }
-    setDownloading(false);
-    setDownloadComplete(true);
-    setTimeout(() => {
-      setDownloadComplete(false);
-      setProgress(null);
-    }, 2000);
   }
 
   return (
@@ -63,7 +73,7 @@ export default function DownloadButton(
       class={clsx("relative", btnProps.class)}
       loading={downloading()}
       onClick={handleDownload}
-      disabled={downloading()}
+      disabled={btnProps.disabled || downloading()}
     >
       <Switch fallback={<span class={downloadProps.icon} />}>
         <Match when={downloading()}>{null}</Match>

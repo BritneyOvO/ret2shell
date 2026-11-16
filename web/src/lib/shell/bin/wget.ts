@@ -1,5 +1,5 @@
 import { api_root } from "@api";
-import { getChallengeAttachments } from "@api/challenge";
+import { getChallengeAttachmentDownloadUrl, getChallengeAttachments } from "@api/challenge";
 import { downloadFile } from "@api/file";
 import type { Challenge } from "@models/challenge";
 import type { Game } from "@models/game";
@@ -41,6 +41,13 @@ export class Wget implements Command {
         return 1;
       }
 
+      const directUrl = await getChallengeAttachmentDownloadUrl(game.id, challenge.id, found.file, found.folder);
+      if (directUrl) {
+        const a = document.createElement("a");
+        a.href = directUrl;
+        a.click();
+        return 0;
+      }
       const blob = await downloadFile(
         `${api_root}/game/${game.id}/challenge/${challenge.id}/file`,
         { file: found.file, folder: found.folder },
