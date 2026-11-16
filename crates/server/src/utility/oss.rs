@@ -545,4 +545,64 @@ mod tests {
     );
     fs::remove_dir_all(repo).unwrap();
   }
+
+  #[tokio::test]
+  #[ignore = "requires a private OSS test bucket with object deletion permission"]
+  async fn sync_and_download_from_oss() {
+    let oss = AttachmentOss::from_env()
+      .unwrap()
+      .expect("OSS must be configured");
+    let repo = std::env::temp_dir().join(format!("r2s-oss-integration-{}", std::process::id()));
+    let folder = repo.join("challenges/test/static");
+    fs::create_dir_all(&folder).unwrap();
+    fs::write(
+      folder.join("attachment.txt"),
+      b"ret2shell oss integration test\n",
+    )
+    .unwrap();
+    let git = |args: &[&str]| {
+      assert!(
+        Command::new("git")
+          .current_dir(&repo)
+          .args(args)
+          .status()
+          .unwrap()
+          .success()
+      );
+    };
+    git(&["init", "-q"]);
+    git(&["add", "."]);
+    git(&[
+      "-c",
+      "user.name=Test",
+      "-c",
+      "user.email=test@example.com",
+      "commit",
+      "-qm",
+      "test",
+    ]);
+
+    let oid = file_oid(&repo, "test", "static", "attachment.txt")
+      .await
+      .unwrap();
+    let game_id = i64::MAX - i64::from(std::process::id());
+    oss.sync_repository(game_id, &repo).await.unwrap();
+    let url = oss
+      .download_url(game_id, &oid, "attachment.txt")
+      .await
+      .unwrap()
+      .unwrap();
+    let response = Command::new("curl")
+      .args(["--fail", "--silent", "--max-time", "30", &url])
+      .output()
+      .unwrap();
+    assert!(response.status.success(), "signed OSS download failed");
+    assert_eq!(response.stdout, b"ret2shell oss integration test\n");
+    oss
+      .operator
+      .delete(&AttachmentOss::key(game_id, &oid))
+      .await
+      .unwrap();
+    fs::remove_dir_all(repo).unwrap();
+  }
 }
