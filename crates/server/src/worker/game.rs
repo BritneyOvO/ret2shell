@@ -79,6 +79,9 @@ impl ScoreMaintenance {
 }
 
 pub async fn spawn_game_workers(state: GlobalState) {
+  if state.attachment_oss.is_some() {
+    tokio::spawn(super::oss::sync_worker(state.clone()));
+  }
   let queue = state.queue.clone();
   let database = state.db.clone();
   let checker = state.checker.clone();

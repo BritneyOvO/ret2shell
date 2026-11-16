@@ -34,6 +34,7 @@ pub(super) struct FileRequest {
   pub folder: Option<FileType>,
   pub file: Option<String>,
   pub all: Option<bool>,
+  pub url: Option<bool>,
 }
 
 #[derive(Serialize)]
@@ -44,6 +45,7 @@ pub(super) struct FileResponse {
 
 pub(super) async fn get_player_attachment(
   State(ref db): State<Database>, State(ref bucket): State<Bucket>,
+  State(ref oss): State<Option<crate::utility::oss::AttachmentOss>>,
   Extension(game): Extension<game::Model>, Extension(challenge): Extension<challenge::Model>,
   Extension(token): Extension<Token>, team_ext: Extension<Option<team::Model>>,
   Query(query): Query<FileRequest>,
@@ -113,6 +115,48 @@ pub(super) async fn get_player_attachment(
       FileType::Mapped => challenge_bucket.download_mapped(&file_name).await?,
       FileType::Checker => challenge_bucket.download_checker(&file_name).await?,
     };
+
+    if query.url == Some(true) {
+      let mut url = None;
+      let folder_name = match folder {
+        FileType::Static => Some("static"),
+        FileType::Mapped => Some("mapped"),
+        FileType::Checker => None,
+      };
+      if let Some(oss) = oss
+        && let Some(folder_name) = folder_name
+        && let Some(repo) = challenge_bucket
+          .path
+          .parent()
+          .and_then(|path| path.parent())
+      {
+        match crate::utility::oss::file_oid(repo, &challenge_bucket.name, folder_name, &file_name)
+          .await
+        {
+          Ok(oid) => match oss.download_url(game.id, &oid, &file_name).await {
+            Ok(value) => url = value,
+            Err(_) => warn!(
+              game_id = game.id,
+              "failed to prepare OSS attachment download"
+            ),
+          },
+          Err(_) => debug!(
+            game_id = game.id,
+            "attachment is not available in the committed repository"
+          ),
+        }
+      }
+      if url.is_some() {
+        info!(file=%file_name, ?folder, "issued OSS attachment download URL");
+      }
+      return Ok(
+        (
+          [("Cache-Control", "no-store")],
+          Json(serde_json::json!({ "url": url })),
+        )
+          .into_response(),
+      );
+    }
 
     let mut header = HeaderMap::new();
     header.insert("Content-Length", file.metadata().await?.len().into());

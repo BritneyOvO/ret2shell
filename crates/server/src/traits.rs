@@ -32,6 +32,7 @@ pub struct GlobalState {
   pub cache: Cache,
   pub auditor: Auditor,
   pub bucket: Bucket,
+  pub attachment_oss: Option<crate::utility::oss::AttachmentOss>,
   pub engine: Engine,
   pub queue: Queue,
   pub oauth: OAuth,

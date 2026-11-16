@@ -104,6 +104,7 @@ pub async fn up(config: GlobalConfig) -> anyhow::Result<()> {
     cache,
     auditor,
     bucket,
+    attachment_oss: utility::oss::AttachmentOss::from_env()?,
     engine,
     event,
     queue,

@@ -67,6 +67,7 @@ r2s-media    = { workspace = true }
 r2s-migrator = { workspace = true }
 r2s-oauth    = { workspace = true }
 r2s-queue    = { workspace = true }
+opendal = { version = "0.59.5", default-features = false, features = ["services-oss", "http-transport-reqwest", "executors-tokio"] }
 
 [build-dependencies]
 build-target  = { workspace = true }
