@@ -7,6 +7,7 @@ use tokio::{io::AsyncReadExt, process::Command};
 #[derive(Clone)]
 pub struct AttachmentOss {
   operator: Operator,
+  media_enabled: bool,
 }
 
 impl AttachmentOss {
@@ -22,18 +23,78 @@ impl AttachmentOss {
     if let Ok(endpoint) = std::env::var("R2S_OSS_PUBLIC_ENDPOINT") {
       builder = builder.presign_endpoint(&endpoint);
     }
-    Ok(Some(Self::new(builder)?))
+    let mut oss = Self::new(builder)?;
+    oss.media_enabled = match std::env::var("R2S_OSS_MEDIA_ENABLED").as_deref() {
+      Ok("true") => true,
+      Ok("false") | Err(std::env::VarError::NotPresent) => false,
+      _ => bail!("R2S_OSS_MEDIA_ENABLED must be true or false"),
+    };
+    Ok(Some(oss))
   }
 
   fn new(builder: Oss) -> opendal::Result<Self> {
     opendal::install_default();
     Ok(Self {
       operator: Operator::new(builder)?,
+      media_enabled: false,
     })
   }
 
   fn key(game_id: i64, oid: &str) -> String {
     format!("ret2shell/attachments/{game_id}/{oid}")
+  }
+
+  pub fn media_enabled(&self) -> bool {
+    self.media_enabled
+  }
+
+  fn media_key(hash: &str) -> anyhow::Result<String> {
+    if hash.len() != 64
+      || !hash
+        .bytes()
+        .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+    {
+      bail!("invalid media hash");
+    }
+    Ok(format!("ret2shell/media/{hash}"))
+  }
+
+  pub async fn sync_media(&self, media: &r2s_media::Media, hash: &str) -> anyhow::Result<()> {
+    let key = Self::media_key(hash)?;
+    let mime = media.get_mime_type(hash)?;
+    if mime == "image/svg+xml" || self.operator.exists(&key).await? {
+      return Ok(());
+    }
+    let mut file = media.get(hash).await?;
+    let mut writer = self
+      .operator
+      .writer_with(&key)
+      .content_type(&mime)
+      .chunk(1024 * 1024)
+      .await?;
+    let mut buffer = vec![0; 1024 * 1024];
+    loop {
+      let size = file.read(&mut buffer).await?;
+      if size == 0 {
+        break;
+      }
+      writer.write(buffer[..size].to_vec()).await?;
+    }
+    writer.close().await?;
+    Ok(())
+  }
+
+  pub async fn media_url(&self, hash: &str, mime: &str) -> anyhow::Result<Option<String>> {
+    let key = Self::media_key(hash)?;
+    if mime == "image/svg+xml" || !self.operator.exists(&key).await? {
+      return Ok(None);
+    }
+    let request = self
+      .operator
+      .presign_read_with(&key, Duration::from_secs(300))
+      .override_content_disposition("inline")
+      .await?;
+    Ok(Some(request.uri().to_string()))
   }
 
   pub async fn download_url(
@@ -223,6 +284,111 @@ mod tests {
   use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
   use super::{AttachmentOss, attachment_oid, changed_attachment_oids, file_oid};
+
+  #[tokio::test]
+  async fn media_sync_uploads_image_bytes_and_content_type() {
+    const PNG: &[u8] = &[
+      137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4,
+      0, 0, 0, 181, 28, 12, 2, 0, 0, 0, 11, 73, 68, 65, 84, 120, 218, 99, 252, 255, 31, 0, 3, 3, 2,
+      0, 239, 191, 167, 219, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
+    ];
+    let suffix = SystemTime::now()
+      .duration_since(SystemTime::UNIX_EPOCH)
+      .unwrap()
+      .as_nanos();
+    let dir = std::env::temp_dir().join(format!("r2s-media-oss-{}-{suffix}", std::process::id()));
+    let media = r2s_media::Media::try_open(&dir).await.unwrap();
+    let model = media.save(PNG).await.unwrap();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let endpoint = format!("http://{}", listener.local_addr().unwrap());
+    let oss = AttachmentOss::new(
+      Oss::default()
+        .bucket("test-bucket")
+        .endpoint(&endpoint)
+        .addressing_style("path")
+        .access_key_id("test-key")
+        .access_key_secret("test-secret"),
+    )
+    .unwrap();
+    let server = tokio::spawn(async move {
+      let (mut head, _) = listener.accept().await.unwrap();
+      let mut buf = [0; 8192];
+      assert!(head.read(&mut buf).await.unwrap() > 0);
+      head
+        .write_all(b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+        .await
+        .unwrap();
+      let (mut put, _) = listener.accept().await.unwrap();
+      let mut request = Vec::new();
+      loop {
+        let n = put.read(&mut buf).await.unwrap();
+        assert!(n > 0);
+        request.extend_from_slice(&buf[..n]);
+        if let Some(pos) = request.windows(4).position(|window| window == b"\r\n\r\n")
+          && request.len() >= pos + 4 + PNG.len()
+        {
+          break;
+        }
+      }
+      let text = String::from_utf8_lossy(&request).to_ascii_lowercase();
+      assert!(text.starts_with("put "));
+      assert!(text.contains("content-type: image/png"));
+      assert!(request.ends_with(PNG));
+      put
+        .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+        .await
+        .unwrap();
+    });
+    oss.sync_media(&media, &model.hash).await.unwrap();
+    server.await.unwrap();
+    fs::remove_dir_all(dir).unwrap();
+  }
+
+  #[tokio::test]
+  async fn media_redirect_requires_an_existing_non_svg_object() {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let endpoint = format!("http://{}", listener.local_addr().unwrap());
+    let oss = AttachmentOss::new(
+      Oss::default()
+        .bucket("test-bucket")
+        .endpoint(&endpoint)
+        .addressing_style("path")
+        .access_key_id("test-key")
+        .access_key_secret("test-secret"),
+    )
+    .unwrap();
+    let hash = "a".repeat(64);
+    assert!(
+      oss
+        .media_url(&hash, "image/svg+xml")
+        .await
+        .unwrap()
+        .is_none()
+    );
+    assert!(oss.media_url("invalid", "image/png").await.is_err());
+    let server = tokio::spawn(async move {
+      for status in ["404 Not Found", "200 OK"] {
+        let (mut stream, _) = listener.accept().await.unwrap();
+        let mut request = [0; 4096];
+        let size = stream.read(&mut request).await.unwrap();
+        let request = String::from_utf8_lossy(&request[..size]);
+        assert!(request.starts_with("HEAD "));
+        assert!(request.contains("/ret2shell/media/"));
+        stream
+          .write_all(
+            format!("HTTP/1.1 {status}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+              .as_bytes(),
+          )
+          .await
+          .unwrap();
+      }
+    });
+    assert!(oss.media_url(&hash, "image/png").await.unwrap().is_none());
+    let url = oss.media_url(&hash, "image/png").await.unwrap().unwrap();
+    assert!(url.contains("ret2shell/media/"));
+    assert!(url.contains("response-content-disposition="));
+    server.await.unwrap();
+  }
 
   #[tokio::test]
   async fn changed_blobs_include_renames_and_exclude_deleted_and_other_files() {

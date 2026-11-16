@@ -29,6 +29,7 @@ platform:
     endpoint: ""
     publicEndpoint: ""
     credentialsSecret: ""
+    mediaEnabled: false
   serviceAccount:
     create: true
     name: ""

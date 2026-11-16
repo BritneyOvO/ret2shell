@@ -4,15 +4,12 @@ use axum::{
   extract::{DefaultBodyLimit, Multipart, Query, State},
   http::{HeaderMap, HeaderValue, StatusCode},
   middleware,
-  response::IntoResponse,
+  response::{IntoResponse, Response},
   routing::{get, post},
 };
 use axum_extra::{TypedHeader, headers::Host};
 use futures::TryStreamExt;
-use r2s_cache::Cache;
 use r2s_database::{config, media, user::Permission};
-use r2s_media::Media;
-use r2s_migrator::Database;
 use serde::Deserialize;
 use tokio_util::io::{ReaderStream, StreamReader};
 use tracing::warn;
@@ -40,10 +37,9 @@ struct MediaQuery {
 }
 
 async fn get_media(
-  TypedHeader(host): TypedHeader<Host>, State(ref db): State<Database>,
-  State(ref media): State<Media>, Extension(config): Extension<config::Model>,
-  Query(query): Query<MediaQuery>,
-) -> Result<impl IntoResponse, ResponseError> {
+  TypedHeader(host): TypedHeader<Host>, State(ref state): State<GlobalState>,
+  Extension(config): Extension<config::Model>, Query(query): Query<MediaQuery>,
+) -> Result<Response, ResponseError> {
   if config.media.is_some_and(|media| media.anti_theft)
     && config
       .server
@@ -56,22 +52,44 @@ async fn get_media(
     );
     return Err(ResponseError::Forbidden("origin is not allowed".to_owned()));
   }
-  let model = media::get_by_hash(&db.conn, &query.hash).await?;
+  let model = media::get_by_hash(&state.db.conn, &query.hash).await?;
   if model.is_none() {
     return Err(ResponseError::NotFound("media".to_string()));
   }
-  let file = media.get(&query.hash).await?;
+  let mime = state.media.get_mime_type(&query.hash)?;
+  if let Some(oss) = &state.attachment_oss
+    && oss.media_enabled()
+    && mime != "image/svg+xml"
+  {
+    match oss.media_url(&query.hash, &mime).await {
+      Ok(Some(url)) => match HeaderValue::from_str(&url) {
+        Ok(location) => {
+          return Ok(
+            (
+              StatusCode::FOUND,
+              [
+                ("location", location),
+                ("cache-control", HeaderValue::from_static("no-store")),
+              ],
+            )
+              .into_response(),
+          );
+        }
+        Err(err) => warn!(error=?err, "invalid media OSS redirect"),
+      },
+      Ok(None) => {}
+      Err(err) => warn!(error=?err, "failed to prepare media OSS redirect"),
+    }
+  }
+  let file = state.media.get(&query.hash).await?;
   let stream = ReaderStream::new(file);
   let mut headers = HeaderMap::new();
   headers.insert(
     "Content-Type",
-    media
-      .get_mime_type(&query.hash)?
-      .parse::<HeaderValue>()
-      .map_err(|e| {
-        warn!(error=?e, "failed to parse mime type");
-        ResponseError::InternalServerError("failed to parse mime type".to_string())
-      })?,
+    mime.parse::<HeaderValue>().map_err(|e| {
+      warn!(error=?e, "failed to parse mime type");
+      ResponseError::InternalServerError("failed to parse mime type".to_string())
+    })?,
   );
   headers.insert(
     "Content-Security-Policy",
@@ -79,7 +97,7 @@ async fn get_media(
       "script-src 'none'; object-src 'none'; report-uri /cspreport; sandbox",
     ),
   );
-  Ok((StatusCode::OK, headers, Body::from_stream(stream)))
+  Ok((StatusCode::OK, headers, Body::from_stream(stream)).into_response())
 }
 
 #[derive(Deserialize)]
@@ -88,11 +106,11 @@ struct UploadMediaQuery {
 }
 
 async fn upload_media(
-  State(ref media): State<Media>, State(ref cache): State<Cache>, State(ref db): State<Database>,
-  Extension(token): Extension<Token>, Extension(config): Extension<config::Model>,
-  Query(query): Query<UploadMediaQuery>, mut multipart: Multipart,
+  State(ref state): State<GlobalState>, Extension(token): Extension<Token>,
+  Extension(config): Extension<config::Model>, Query(query): Query<UploadMediaQuery>,
+  mut multipart: Multipart,
 ) -> Result<impl IntoResponse, ResponseError> {
-  let uploads: Option<i32> = cache.at("media").get(token.id).await?;
+  let uploads: Option<i32> = state.cache.at("media").get(token.id).await?;
   if !token.permissions.0.contains(&Permission::Bulletin)
     && !token.permissions.0.contains(&Permission::Game)
     && !token.permissions.0.contains(&Permission::Wiki)
@@ -110,12 +128,13 @@ async fn upload_media(
     && !token.permissions.0.contains(&Permission::Host)
     && !token.permissions.0.contains(&Permission::Wiki)
   {
-    cache
+    state
+      .cache
       .at("media")
       .set_ex(token.id, 1, 60 * 60 * 24 * 7)
       .await?;
   } else {
-    cache.at("media").incr(token.id).await?;
+    state.cache.at("media").incr(token.id).await?;
   }
 
   if let Some(field) = multipart
@@ -124,24 +143,25 @@ async fn upload_media(
     .map_err(|err| ResponseError::BadRequest(err.to_string()))?
   {
     let reader = StreamReader::new(field.map_err(std::io::Error::other));
-    let model = media.save(reader).await?;
+    let model = state.media.save(reader).await?;
     if query.thumbnail.unwrap_or(false) {
-      media.make_thumbnail(&model.hash, 128).await?;
+      state.media.make_thumbnail(&model.hash, 128).await?;
     }
-    if let Some(result) = media::get_by_hash(&db.conn, &model.hash).await? {
-      Ok(Json(result))
+    let model = if let Some(result) = media::get_by_hash(&state.db.conn, &model.hash).await? {
+      result
     } else {
-      let model = media::create(
-        &db.conn,
+      media::create(
+        &state.db.conn,
         media::Model {
           id: 0,
           uploader_id: token.id,
           ..model
         },
       )
-      .await?;
-      Ok(Json(model))
-    }
+      .await?
+    };
+    crate::worker::media_oss::enqueue(state, &model.hash).await;
+    Ok(Json(model))
   } else {
     Err(ResponseError::BadRequest("no file uploaded".to_owned()))
   }

@@ -180,6 +180,10 @@ spec:
               value: {{ .bucket | quote }}
             - name: R2S_OSS_ENDPOINT
               value: {{ required "platform.attachmentOss.endpoint is required when OSS is enabled" .endpoint | quote }}
+            {{- if .mediaEnabled }}
+            - name: R2S_OSS_MEDIA_ENABLED
+              value: "true"
+            {{- end }}
             {{- if .publicEndpoint }}
             - name: R2S_OSS_PUBLIC_ENDPOINT
               value: {{ .publicEndpoint | quote }}

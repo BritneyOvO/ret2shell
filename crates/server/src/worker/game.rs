@@ -83,6 +83,14 @@ pub async fn spawn_game_workers(state: GlobalState) {
     tokio::spawn(super::oss::sync_worker(state.clone()));
     tokio::spawn(super::oss::queue_worker(state.clone()));
   }
+  if state
+    .attachment_oss
+    .as_ref()
+    .is_some_and(|oss| oss.media_enabled())
+  {
+    tokio::spawn(super::media_oss::queue_worker(state.clone()));
+    tokio::spawn(super::media_oss::reconcile_worker(state.clone()));
+  }
   let queue = state.queue.clone();
   let database = state.db.clone();
   let checker = state.checker.clone();
