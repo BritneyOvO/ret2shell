@@ -8,7 +8,6 @@ use axum::{
 use futures::TryStreamExt;
 use r2s_bucket::{Bucket, challenge::ChallengeBucket};
 use r2s_database::{challenge, game, team, user::Permission};
-use r2s_migrator::Database;
 use serde::{Deserialize, Serialize};
 use tokio_util::io::{ReaderStream, StreamReader};
 use tracing::{debug, info, warn};
@@ -44,15 +43,13 @@ pub(super) struct FileResponse {
 }
 
 pub(super) async fn get_player_attachment(
-  State(ref db): State<Database>, State(ref bucket): State<Bucket>,
-  State(ref oss): State<Option<crate::utility::oss::AttachmentOss>>,
-  Extension(game): Extension<game::Model>, Extension(challenge): Extension<challenge::Model>,
-  Extension(token): Extension<Token>, team_ext: Extension<Option<team::Model>>,
-  Query(query): Query<FileRequest>,
+  State(ref state): State<crate::traits::GlobalState>, Extension(game): Extension<game::Model>,
+  Extension(challenge): Extension<challenge::Model>, Extension(token): Extension<Token>,
+  team_ext: Extension<Option<team::Model>>, Query(query): Query<FileRequest>,
 ) -> Result<Response, ResponseError> {
   let team = extract_team!(game, team_ext, token);
   let gating_team_id = team.as_ref().map(|t| t.id);
-  let challenge_bucket = super::get_challenge_bucket(bucket, &game, &challenge).await?;
+  let challenge_bucket = super::get_challenge_bucket(&state.bucket, &game, &challenge).await?;
   if !is_game_admin!(token, game)
     && (query.all == Some(true) || query.folder == Some(FileType::Checker))
   {
@@ -92,7 +89,7 @@ pub(super) async fn get_player_attachment(
     // game admins are exempt from prerequisite gating
     if !is_game_admin!(token, game) {
       let unsatisfied =
-        challenge::unsatisfied_prerequisites(&db.conn, &challenge, gating_team_id, token.id)
+        challenge::unsatisfied_prerequisites(&state.db.conn, &challenge, gating_team_id, token.id)
           .await?;
       if !unsatisfied.is_empty() {
         info!(
@@ -123,7 +120,7 @@ pub(super) async fn get_player_attachment(
         FileType::Mapped => Some("mapped"),
         FileType::Checker => None,
       };
-      if let Some(oss) = oss
+      if let Some(oss) = &state.attachment_oss
         && let Some(folder_name) = folder_name
         && let Some(repo) = challenge_bucket
           .path

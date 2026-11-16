@@ -89,11 +89,11 @@ impl AttachmentOss {
     }
     let mut failures = 0;
     for record in output.stdout.split(|b| *b == 0).filter(|r| !r.is_empty()) {
-      if let Some(oid) = attachment_oid(record) {
-        if let Err(err) = self.upload(game_id, repo, oid).await {
-          tracing::warn!(game_id, oid, error=?err, "failed to sync attachment");
-          failures += 1;
-        }
+      if let Some(oid) = attachment_oid(record)
+        && let Err(err) = self.upload(game_id, repo, oid).await
+      {
+        tracing::warn!(game_id, oid, error=?err, "failed to sync attachment");
+        failures += 1;
       }
     }
     if failures > 0 {
