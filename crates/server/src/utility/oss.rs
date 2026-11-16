@@ -22,9 +22,14 @@ impl AttachmentOss {
     if let Ok(endpoint) = std::env::var("R2S_OSS_PUBLIC_ENDPOINT") {
       builder = builder.presign_endpoint(&endpoint);
     }
-    Ok(Some(Self {
+    Ok(Some(Self::new(builder)?))
+  }
+
+  fn new(builder: Oss) -> opendal::Result<Self> {
+    opendal::install_default();
+    Ok(Self {
       operator: Operator::new(builder)?,
-    }))
+    })
   }
 
   fn key(game_id: i64, oid: &str) -> String {
@@ -153,7 +158,10 @@ pub async fn file_oid(
 mod tests {
   use std::{fs, process::Command, time::SystemTime};
 
-  use super::{attachment_oid, file_oid};
+  use opendal::services::Oss;
+  use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+  use super::{AttachmentOss, attachment_oid, file_oid};
 
   #[test]
   fn only_selected_attachment_blobs_are_synced() {
@@ -177,6 +185,32 @@ mod tests {
       attachment_oid(b"100644 blob abcd\tchallenges/test/static/.hidden"),
       None
     );
+  }
+
+  #[tokio::test]
+  async fn oss_requests_use_the_installed_http_transport() {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let endpoint = format!("http://{}", listener.local_addr().unwrap());
+    let server = tokio::spawn(async move {
+      let (mut stream, _) = listener.accept().await.unwrap();
+      let mut request = [0; 4096];
+      assert!(stream.read(&mut request).await.unwrap() > 0);
+      stream
+        .write_all(b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+        .await
+        .unwrap();
+    });
+    let oss = AttachmentOss::new(
+      Oss::default()
+        .bucket("test-bucket")
+        .endpoint(&endpoint)
+        .addressing_style("path")
+        .access_key_id("test-key")
+        .access_key_secret("test-secret"),
+    )
+    .unwrap();
+    assert!(!oss.operator.exists("attachment").await.unwrap());
+    server.await.unwrap();
   }
 
   #[tokio::test]
