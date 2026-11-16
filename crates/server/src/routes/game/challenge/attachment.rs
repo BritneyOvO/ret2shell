@@ -199,13 +199,25 @@ pub(super) struct UploadChallengeAttachmentQuery {
 }
 
 pub(super) async fn upload_challenge_attachment(
-  State(bucket): State<Bucket>, Extension(token): Extension<Token>,
+  State(state): State<crate::traits::GlobalState>, Extension(token): Extension<Token>,
   Extension(game): Extension<game::Model>, Extension(challenge): Extension<challenge::Model>,
   Query(query): Query<UploadChallengeAttachmentQuery>, mut multipart: Multipart,
 ) -> Result<impl IntoResponse, ResponseError> {
   super::check_challenge_publishing(&challenge)?;
   let (game_bucket, challenge_bucket) =
-    super::get_challenge_bucket_mut(&bucket, &game, &challenge).await?;
+    super::get_challenge_bucket_mut(&state.bucket, &game, &challenge).await?;
+  let old_head = if state.attachment_oss.is_some() && query.folder != FileType::Checker {
+    game_bucket
+      .git
+      .get_head()
+      .await
+      .inspect_err(|err| {
+        warn!(game_id=game.id, error=?err, "failed to capture attachment revision for OSS sync");
+      })
+      .ok()
+  } else {
+    None
+  };
   while let Some(field) = multipart
     .next_field()
     .await
@@ -233,6 +245,13 @@ pub(super) async fn upload_challenge_attachment(
     )
     .await?;
   info!("user committed attachment files");
+
+  if let Some(old) = old_head {
+    match game_bucket.git.get_head().await {
+      Ok(new) => crate::worker::oss::enqueue(&state, &game, &old, &new, "attachment-upload").await,
+      Err(err) => warn!(game_id=game.id, error=?err, "failed to enqueue attachment OSS sync"),
+    }
+  }
 
   Ok(())
 }

@@ -106,21 +106,82 @@ impl AttachmentOss {
     }
     Ok(())
   }
+
+  pub async fn sync_changes(
+    &self, game_id: i64, repo: &Path, old: &str, new: &str,
+  ) -> anyhow::Result<()> {
+    for oid in changed_attachment_oids(repo, old, new).await? {
+      self.upload(game_id, repo, &oid).await?;
+    }
+    Ok(())
+  }
+}
+
+async fn changed_attachment_oids(repo: &Path, old: &str, new: &str) -> anyhow::Result<Vec<String>> {
+  let output = Command::new("git")
+    .current_dir(repo)
+    .args([
+      "diff",
+      "--name-only",
+      "-z",
+      "--diff-filter=ACMRT",
+      old,
+      new,
+      "--",
+      "challenges",
+    ])
+    .output()
+    .await?;
+  if !output.status.success() {
+    bail!("git diff failed");
+  }
+  let mut oids = Vec::new();
+  for path in output
+    .stdout
+    .split(|byte| *byte == 0)
+    .filter(|path| !path.is_empty())
+  {
+    let path = std::str::from_utf8(path).context("invalid attachment path")?;
+    if !is_attachment_path(path) {
+      continue;
+    }
+    let literal = format!(":(literal){path}");
+    let tree = Command::new("git")
+      .current_dir(repo)
+      .args(["ls-tree", "-rz", "--full-tree", new, "--", &literal])
+      .output()
+      .await?;
+    if !tree.status.success() {
+      bail!("git ls-tree failed");
+    }
+    for record in tree
+      .stdout
+      .split(|byte| *byte == 0)
+      .filter(|record| !record.is_empty())
+    {
+      if let Some(oid) = attachment_oid(record) {
+        oids.push(oid.to_owned());
+      }
+    }
+  }
+  Ok(oids)
+}
+
+fn is_attachment_path(path: &str) -> bool {
+  let mut parts = path.split('/');
+  matches!(parts.next(), Some("challenges"))
+    && parts.next().is_some_and(|name| !name.is_empty())
+    && matches!(parts.next(), Some("static" | "mapped"))
+    && parts
+      .next()
+      .is_some_and(|file| !file.is_empty() && !file.starts_with('.'))
+    && parts.next().is_none()
 }
 
 fn attachment_oid(record: &[u8]) -> Option<&str> {
   let record = std::str::from_utf8(record).ok()?;
   let (info, path) = record.split_once('\t')?;
-  let mut parts = path.split('/');
-  if parts.next()? != "challenges" {
-    return None;
-  }
-  parts.next()?;
-  if !matches!(parts.next()?, "static" | "mapped") {
-    return None;
-  }
-  let file = parts.next()?;
-  if file.starts_with('.') || parts.next().is_some() {
+  if !is_attachment_path(path) {
     return None;
   }
   let (mode, oid) = info.split_once(" blob ")?;
@@ -161,7 +222,71 @@ mod tests {
   use opendal::services::Oss;
   use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-  use super::{AttachmentOss, attachment_oid, file_oid};
+  use super::{AttachmentOss, attachment_oid, changed_attachment_oids, file_oid};
+
+  #[tokio::test]
+  async fn changed_blobs_include_renames_and_exclude_deleted_and_other_files() {
+    let suffix = SystemTime::now()
+      .duration_since(SystemTime::UNIX_EPOCH)
+      .unwrap()
+      .as_nanos();
+    let repo = std::env::temp_dir().join(format!("r2s-oss-diff-{}-{suffix}", std::process::id()));
+    let static_dir = repo.join("challenges/test/static");
+    let checker = repo.join("challenges/test/checker");
+    fs::create_dir_all(&static_dir).unwrap();
+    fs::create_dir_all(&checker).unwrap();
+    fs::write(static_dir.join("old"), b"renamed").unwrap();
+    fs::write(static_dir.join("removed"), b"removed").unwrap();
+    let git = |args: &[&str]| {
+      let output = Command::new("git")
+        .current_dir(&repo)
+        .args(args)
+        .output()
+        .unwrap();
+      assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+      );
+      String::from_utf8(output.stdout).unwrap().trim().to_owned()
+    };
+    git(&["init", "-q"]);
+    git(&["add", "."]);
+    git(&[
+      "-c",
+      "user.name=Test",
+      "-c",
+      "user.email=test@example.com",
+      "commit",
+      "-qm",
+      "first",
+    ]);
+    let old = git(&["rev-parse", "HEAD"]);
+    fs::rename(static_dir.join("old"), static_dir.join("[new]")).unwrap();
+    fs::remove_file(static_dir.join("removed")).unwrap();
+    fs::write(static_dir.join("added"), b"added").unwrap();
+    fs::write(checker.join("checker"), b"checker").unwrap();
+    git(&["add", "-A"]);
+    git(&[
+      "-c",
+      "user.name=Test",
+      "-c",
+      "user.email=test@example.com",
+      "commit",
+      "-qm",
+      "second",
+    ]);
+    let new = git(&["rev-parse", "HEAD"]);
+    let mut actual = changed_attachment_oids(&repo, &old, &new).await.unwrap();
+    actual.sort();
+    let mut expected = vec![
+      git(&["rev-parse", "HEAD:challenges/test/static/[new]"]),
+      git(&["rev-parse", "HEAD:challenges/test/static/added"]),
+    ];
+    expected.sort();
+    assert_eq!(actual, expected);
+    fs::remove_dir_all(repo).unwrap();
+  }
 
   #[test]
   fn only_selected_attachment_blobs_are_synced() {

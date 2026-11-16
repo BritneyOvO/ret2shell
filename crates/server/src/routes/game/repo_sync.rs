@@ -376,6 +376,15 @@ async fn execute_post_receive(
     }
   };
 
+  crate::worker::oss::enqueue(
+    &state,
+    &game,
+    &updates[0].old_oid,
+    &updates[0].new_oid,
+    &session.trace_id,
+  )
+  .await;
+
   if outcome.invalidate_game
     && let Err(err) = state.cache.at("game").del(game.id).await
   {

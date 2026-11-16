@@ -22,7 +22,7 @@ Optional environment variables for the server process:
 - `ALIBABA_CLOUD_ACCESS_KEY_ID` and `ALIBABA_CLOUD_ACCESS_KEY_SECRET`: credentials with access to the attachment prefix.
 - `ALIBABA_CLOUD_SECURITY_TOKEN`: security token when using temporary credentials.
 
-The server scans committed static and mapped challenge files every 60 seconds and uploads missing Git blob versions under `ret2shell/attachments/`. Grant the server permission to read and write this prefix and keep the bucket private. Existing downloads fall back to the application server while a file is not yet synced or OSS is unavailable. Browser download links expire after five minutes. Checker attachments remain local.
+The server queues changed static and mapped challenge files for upload after an attachment upload or Git push. Failed jobs are retried, and a full reconciliation runs at startup and every 24 hours to recover missed jobs and existing files. Git blob versions are stored under `ret2shell/attachments/`. Grant the server permission to read and write this prefix and keep the bucket private. Existing downloads fall back to the application server while a file is not yet synced or OSS is unavailable. Browser download links expire after five minutes. Checker attachments remain local.
 
 For Helm deployments, set `platform.attachmentOss.bucket`, `endpoint`, and optionally `publicEndpoint`. Set `credentialsSecret` to an existing Kubernetes Secret containing the Alibaba Cloud credential environment variables above, or use an available workload identity.
 
