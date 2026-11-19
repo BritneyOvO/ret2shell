@@ -21,6 +21,7 @@ use r2s_event::{
 };
 use r2s_migrator::Database;
 use r2s_queue::Queue;
+use regex::Regex;
 use sea_orm::TransactionTrait;
 use serde::Deserialize;
 use serde_json::Value;
@@ -44,6 +45,19 @@ const DEFAULT_GAME_RULES_ZH_CN: &str = include_str!("./docs/rules.zh_cn.md");
 const DEFAULT_GAME_RULES_EN_US: &str = include_str!("./docs/rules.en_us.md");
 const DEFAULT_GAME_RULES_ZH_TW: &str = include_str!("./docs/rules.zh_tw.md");
 const DEFAULT_GAME_RULES_JA_JP: &str = include_str!("./docs/rules.ja_jp.md");
+
+fn validate_team_name_pattern(game: &game::Model) -> Result<(), ResponseError> {
+  if let Some(pattern) = game.team_name_pattern.as_deref() {
+    if pattern.trim().is_empty() {
+      return Err(ResponseError::BadRequest(
+        "team name pattern cannot be empty".to_owned(),
+      ));
+    }
+    Regex::new(pattern)
+      .map_err(|error| ResponseError::BadRequest(format!("invalid team name pattern: {error}")))?;
+  }
+  Ok(())
+}
 
 #[derive(Clone, Copy, Debug, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -262,6 +276,7 @@ pub(super) async fn create_game(
   State(ref db): State<Database>, State(ref bucket): State<Bucket>,
   Extension(token): Extension<Token>, Json(mut model): Json<game::Model>,
 ) -> Result<impl IntoResponse, ResponseError> {
+  validate_team_name_pattern(&model)?;
   model.validate()?;
   let txn = db.conn.begin().await?;
   let game_bucket = bucket.create(serde_json::to_value(&model)?).await?;
@@ -299,6 +314,7 @@ pub(super) async fn update_game(
   Extension(trace): Extension<RequestId>, Extension(token): Extension<Token>,
   Json(model): Json<game::Model>,
 ) -> Result<impl IntoResponse, ResponseError> {
+  validate_team_name_pattern(&model)?;
   model.validate()?;
   // Weight decides which games are promoted on the home page, so it stays a
   // host-level attribute even though game admins may edit the rest of the game.

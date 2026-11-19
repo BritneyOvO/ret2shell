@@ -15,6 +15,7 @@ use r2s_database::{
 };
 use r2s_migrator::Database;
 use r2s_queue::Queue;
+use regex::Regex;
 use sea_orm::TransactionTrait;
 use serde::Deserialize;
 use tower_http::request_id::RequestId;
@@ -81,6 +82,24 @@ fn ensure_team_in_game(game: &game::Model, team: &team::Model) -> Result<(), Res
   Ok(())
 }
 
+fn validate_team_name(game: &game::Model, name: &str) -> Result<(), ResponseError> {
+  let Some(pattern) = game.team_name_pattern.as_deref() else {
+    return Ok(());
+  };
+  let regex = Regex::new(pattern).map_err(|error| {
+    ResponseError::InternalServerError(format!("invalid team name pattern: {error}"))
+  })?;
+  let matches_entire_name = regex
+    .find(name)
+    .is_some_and(|matched| matched.start() == 0 && matched.end() == name.len());
+  if !matches_entire_name {
+    return Err(ResponseError::PreconditionFailed(format!(
+      "team name does not match the required format: {pattern}"
+    )));
+  }
+  Ok(())
+}
+
 async fn get_self_team(
   State(ref db): State<Database>, team_ext: Extension<Option<team::Model>>,
 ) -> Result<impl IntoResponse, ResponseError> {
@@ -106,6 +125,7 @@ async fn update_self_team(
   let mut team = team.ok_or_else(|| ResponseError::NotFound("team not found".to_owned()))?;
   team.name = req.name;
   team.tag = req.tag;
+  validate_team_name(&game, &team.name)?;
   team.validate()?;
   if game.archived() {
     warn!("user try to update team in archived game");
@@ -323,6 +343,7 @@ async fn create_team(
   Extension(game): Extension<game::Model>, Extension(token): Extension<auth::Token>,
   Json(req): Json<CreateTeamRequest>,
 ) -> Result<impl IntoResponse, ResponseError> {
+  validate_team_name(&game, &req.name)?;
   if game.register_at > Utc::now() {
     warn!("user try to create team before game start");
     return Err(ResponseError::PreconditionFailed(
@@ -433,6 +454,7 @@ async fn join_team(
   let team = team::get_by_token(&db.conn, game.id, &req.token)
     .await?
     .ok_or_else(|| ResponseError::NotFound("team".to_owned()))?;
+  validate_team_name(&game, &team.name)?;
   let members = team::get_members(&db.conn, team.id).await?;
   if game.team_size > 0 && members.len() >= (game.team_size as usize) {
     warn!(team_id=%team.id, team_name=%team.name, "user try to join team, but team size is full");
@@ -464,6 +486,9 @@ async fn update_team_info(
   Extension(trace): Extension<RequestId>, Json(req): Json<team::Model>,
 ) -> Result<impl IntoResponse, ResponseError> {
   ensure_team_in_game(&game, &team)?;
+  if req.name != team.name {
+    validate_team_name(&game, &req.name)?;
+  }
   req.validate()?;
   let result = team::update(
     &db.conn,

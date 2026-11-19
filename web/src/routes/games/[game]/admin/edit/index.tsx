@@ -24,6 +24,7 @@ export default function () {
       game: {
         ...game.data,
         ...result,
+        team_name_pattern: result.team_name_pattern?.trim() || null,
         env_limit: result.env_limit ?? null,
         start_at: DateTime.fromSeconds(result.start_at!),
         end_at: DateTime.fromSeconds(result.end_at!),

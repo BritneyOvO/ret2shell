@@ -171,6 +171,11 @@ export default function () {
                 />
               )}
             </Field>
+            <Show when={game.data?.team_name_pattern}>
+              <p class="text-sm opacity-60">
+                {t("team.form.name.pattern", { pattern: game.data?.team_name_pattern || "" })}
+              </p>
+            </Show>
             <Field name="tag" validate={[maxLength(32, t("team.form.tag.maximumLength"))]}>
               {(field, props) => (
                 <Input

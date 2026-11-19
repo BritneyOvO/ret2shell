@@ -811,6 +811,10 @@
         "minimum": "容器限制不能少于 1",
         "maximum": "容器限制不能多于 99"
       },
+      "teamNamePattern": {
+        "label": "队伍名格式正则",
+        "placeholder": "留空表示不限制，例如 ^R2S-[A-Z]{2,8}-[0-9]{3}$"
+      },
       "enableTeamAudit": {
         "label": "启用队伍审核",
         "placeholder": "是否启用队伍审核",
@@ -2194,6 +2198,7 @@
         "required": "队伍名称不能为空",
         "maximumLength": "名称最长 32 个字符",
         "placeholder": "请输入队伍名称",
+        "pattern": "队伍名称必须符合 {{pattern}}",
         "chuunibyouGenerator": "中二病生成器"
       },
       "institute": {

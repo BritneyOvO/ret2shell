@@ -811,6 +811,10 @@
         "minimum": "Env limit cannot be less than 1",
         "maximum": "Env limit cannot be more than 99"
       },
+      "teamNamePattern": {
+        "label": "Team name pattern",
+        "placeholder": "Leave empty for no restriction, for example ^R2S-[A-Z]{2,8}-[0-9]{3}$"
+      },
       "enableTeamAudit": {
         "label": "Enable team audit",
         "placeholder": "Whether to enable team audit",
@@ -2194,6 +2198,7 @@
         "required": "Team name cannot be empty",
         "maximumLength": "Name can be at most 32 characters",
         "placeholder": "Please enter team name",
+        "pattern": "Team name must match {{pattern}}",
         "chuunibyouGenerator": "Chuunibyou Generator"
       },
       "institute": {

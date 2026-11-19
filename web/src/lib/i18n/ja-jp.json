@@ -811,6 +811,10 @@
         "minimum": "コンテナ制限は1未満であってはなりません",
         "maximum": "コンテナ制限は99を超えてはなりません"
       },
+      "teamNamePattern": {
+        "label": "チーム名パターン正規表現",
+        "placeholder": "空欄の場合は制限なし。例 ^R2S-[A-Z]{2,8}-[0-9]{3}$"
+      },
       "enableTeamAudit": {
         "label": "チーム審査を有効にする",
         "placeholder": "チーム審査を有効にしますか",
@@ -2194,6 +2198,7 @@
         "required": "チーム名を入力してください",
         "maximumLength": "最大 32 文字まで",
         "placeholder": "チーム名を入力してください",
+        "pattern": "チーム名は {{pattern}} に一致する必要があります",
         "chuunibyouGenerator": "中二病ジェネレーター"
       },
       "institute": {

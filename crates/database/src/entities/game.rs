@@ -202,6 +202,8 @@ pub struct Model {
   pub frozen: bool,
   pub host_type: HostType,
   pub team_size: i32,
+  #[serde(default)]
+  pub team_name_pattern: Option<String>,
   #[validate(range(min = 1, max = 99, message = "env limit must be between 1 and 99"))]
   pub env_limit: Option<i32>,
   #[sea_orm(column_type = "JsonBinary")]
@@ -486,6 +488,7 @@ mod tests {
       frozen: false,
       host_type,
       team_size: 4,
+      team_name_pattern: None,
       env_limit: None,
       access_policy: AccessPolicy {
         restrict: false,
