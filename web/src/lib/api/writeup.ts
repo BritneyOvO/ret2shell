@@ -14,6 +14,56 @@ export type Writeup = {
   created_at: number;
 };
 
+export type WriteupExample = {
+  game_id: number;
+  uploader_id: number;
+  media_hash: string;
+  filename: string;
+  content_type: string;
+  updated_at: number;
+};
+
+export async function getWriteupExample(gameId: number) {
+  return await api.get(`${api_root}/game/${gameId}/writeup/example`).json<WriteupExample | null>();
+}
+
+export function useWriteupExample(gameId: () => number, enabled?: () => boolean) {
+  const keys = createMemo(() => ["game", gameId(), "writeup-example"]);
+  return useQuery(
+    () => ({
+      queryKey: keys(),
+      queryFn: () => getWriteupExample(gameId()),
+      enabled: enabled?.(),
+      throwOnError: (error: Error) => {
+        handleHttpError(error, t("game.writeup.example.fetchFail"));
+        return false;
+      },
+    }),
+    () => inflyClient
+  );
+}
+
+export async function uploadWriteupExample(gameId: number, file: File) {
+  const form = new FormData();
+  form.append("file", file, file.name);
+  return await api.post(`${api_root}/game/${gameId}/writeup/example`, { body: form }).json<WriteupExample>();
+}
+
+export function useUploadWriteupExample(props: { onSuccess?: () => void } = {}) {
+  return useMutation(() => ({
+    mutationFn: ({ gameId, file }: { gameId: number; file: File }) => uploadWriteupExample(gameId, file),
+    onSuccess: () => {
+      toastSuccess(t("game.writeup.example.uploadSuccess"));
+      props.onSuccess?.();
+    },
+    onError: (error: Error) => handleHttpError(error, t("game.writeup.example.uploadFail")),
+  }));
+}
+
+export async function downloadWriteupExample(gameId: number) {
+  return await api.get(`${api_root}/game/${gameId}/writeup/example/download`).blob();
+}
+
 export async function getWriteups(gameId: number) {
   return await api.get(`${api_root}/game/${gameId}/writeup`).json<Writeup[]>();
 }

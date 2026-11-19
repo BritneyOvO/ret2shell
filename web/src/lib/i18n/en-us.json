@@ -676,6 +676,13 @@
       "filter": "Filter by team ID, name or WP filename",
       "action": "Action",
       "download": "Download",
+      "example": {
+        "download": "Download WP example",
+        "upload": "Upload WP example",
+        "uploadSuccess": "WP example uploaded",
+        "uploadFail": "Failed to upload WP example",
+        "fetchFail": "Failed to fetch WP example"
+      },
       "submit": {
         "title": "Submit WP",
         "hint": "Only PDF, DOC, or DOCX files are supported",

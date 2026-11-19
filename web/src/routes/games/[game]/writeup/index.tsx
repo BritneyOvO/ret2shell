@@ -1,7 +1,9 @@
 import { useGame, useGameDoc, useUpdateGameDocMutation } from "@api/game";
+import { api_root } from "@api/index";
 import { useSelfTeam } from "@api/team";
-import { useSubmitWriteup, useWriteups } from "@api/writeup";
+import { useSubmitWriteup, useUploadWriteupExample, useWriteupExample, useWriteups } from "@api/writeup";
 import Spin from "@assets/animates/spin";
+import DownloadButton from "@blocks/download-button";
 import GameDocForm from "@routes/games/[game]/_blocks/doc-form";
 import { useParams } from "@solidjs/router";
 import { isAdminOfGame } from "@storage/game";
@@ -30,14 +32,22 @@ export default function () {
   const [editorOpen, setEditorOpen] = createSignal(false);
   const team = useSelfTeam({ game_id: gameId, enabled: () => gameId() > 0 });
   const submissions = useWriteups(gameId, () => gameId() > 0 && !!team.data);
+  const example = useWriteupExample(gameId, () => gameId() > 0);
   const latestSubmission = createMemo(() => submissions.data?.[0]);
   const [file, setFile] = createSignal<File>();
   let fileInput: HTMLInputElement | undefined;
+  let exampleInput: HTMLInputElement | undefined;
   const submit = useSubmitWriteup({
     onSuccess: () => {
       setFile(undefined);
       if (fileInput) fileInput.value = "";
       submissions.refetch();
+    },
+  });
+  const uploadExample = useUploadWriteupExample({
+    onSuccess: () => {
+      example.refetch();
+      if (exampleInput) exampleInput.value = "";
     },
   });
 
@@ -99,6 +109,44 @@ export default function () {
           onChange={(event) => setFile(event.currentTarget.files?.[0])}
         />
         <div class="flex flex-wrap items-center gap-3">
+          <Show when={example.data}>
+            {(writeupExample) => (
+              <DownloadButton
+                type="button"
+                level="secondary"
+                icon="icon-[fluent--arrow-download-20-regular] w-5 h-5"
+                file={writeupExample().filename}
+                url={`${api_root}/game/${gameId()}/writeup/example/download`}
+                withFileName
+                title={t("game.writeup.example.download")}
+              />
+            )}
+          </Show>
+          <Show when={isAdmin()}>
+            <input
+              ref={exampleInput}
+              type="file"
+              class="hidden"
+              accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              onChange={(event) => {
+                const selected = event.currentTarget.files?.[0];
+                event.currentTarget.value = "";
+                if (selected) uploadExample.mutate({ gameId: gameId(), file: selected });
+              }}
+            />
+            <Button
+              type="button"
+              level="secondary"
+              disabled={uploadExample.isPending}
+              loading={uploadExample.isPending}
+              title={t("game.writeup.example.upload")}
+              aria-label={t("game.writeup.example.upload")}
+              onClick={() => exampleInput?.click()}
+            >
+              <span class="shrink-0 icon-[fluent--arrow-upload-20-regular] w-5 h-5" />
+              <span>{t("game.writeup.example.upload")}</span>
+            </Button>
+          </Show>
           <Button
             type="button"
             square

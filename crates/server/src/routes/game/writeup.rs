@@ -8,7 +8,7 @@ use axum::{
   routing::get,
 };
 use futures::TryStreamExt;
-use r2s_database::{game, media, team, user::Permission, writeup};
+use r2s_database::{game, media, team, user::Permission, writeup, writeup_example};
 use r2s_migrator::Database;
 use tokio_util::io::{ReaderStream, StreamReader};
 
@@ -28,12 +28,90 @@ pub(crate) async fn get_all_writeups(
 pub fn router(_state: &GlobalState) -> Router<GlobalState> {
   Router::new()
     .route("/writeup", get(get_self_writeups).post(submit_writeup))
+    .route(
+      "/writeup/example",
+      get(get_writeup_example).post(upload_writeup_example),
+    )
+    .route("/writeup/example/download", get(download_writeup_example))
     .route("/writeup/{writeup}/download", get(download_writeup))
     .route_layer(middleware::from_fn(auth::permission_required_all!(
       Permission::Basic,
       Permission::Verified
     )))
     .layer(DefaultBodyLimit::max(MAX_WRITEUP_SIZE))
+}
+
+async fn get_writeup_example(
+  State(ref db): State<Database>, Extension(game): Extension<game::Model>,
+) -> Result<impl IntoResponse, ResponseError> {
+  Ok(Json(writeup_example::get(&db.conn, game.id).await?))
+}
+
+async fn upload_writeup_example(
+  State(ref state): State<GlobalState>, Extension(game): Extension<game::Model>,
+  Extension(token): Extension<Token>, mut multipart: Multipart,
+) -> Result<impl IntoResponse, ResponseError> {
+  if !is_game_admin!(token, game) {
+    return Err(ResponseError::Forbidden("permission denied".to_owned()));
+  }
+  let field = multipart
+    .next_field()
+    .await
+    .map_err(|err| ResponseError::BadRequest(err.to_string()))?
+    .ok_or_else(|| ResponseError::BadRequest("no WP example uploaded".to_owned()))?;
+  let filename = field
+    .file_name()
+    .map(str::to_owned)
+    .ok_or_else(|| ResponseError::BadRequest("WP example filename is required".to_owned()))?;
+  let content_type = validate_file(&filename, field.content_type())?;
+  let reader = StreamReader::new(field.map_err(std::io::Error::other));
+  let stored = state.media.save_document(reader).await?;
+  media::create_if_missing(
+    &state.db.conn,
+    media::Model {
+      uploader_id: token.id,
+      ..stored.clone()
+    },
+  )
+  .await?;
+  let example = writeup_example::upsert(
+    &state.db.conn,
+    writeup_example::Model {
+      game_id: game.id,
+      uploader_id: token.id,
+      media_hash: stored.hash,
+      filename,
+      content_type,
+      updated_at: chrono::Utc::now(),
+    },
+  )
+  .await?;
+  Ok((StatusCode::CREATED, Json(example)))
+}
+
+async fn download_writeup_example(
+  State(ref state): State<GlobalState>, Extension(game): Extension<game::Model>,
+) -> Result<Response, ResponseError> {
+  let example = writeup_example::get(&state.db.conn, game.id)
+    .await?
+    .ok_or_else(|| ResponseError::NotFound("WP example not found".to_owned()))?;
+  let file = state.media.get(&example.media_hash).await?;
+  let mut response = Response::new(Body::from_stream(ReaderStream::new(file)));
+  response.headers_mut().insert(
+    "content-type",
+    HeaderValue::from_str(&example.content_type)
+      .map_err(|_| ResponseError::InternalServerError("invalid content type".to_owned()))?,
+  );
+  let disposition = format!(
+    "attachment; filename*=UTF-8''{}",
+    urlencoding::encode(&example.filename)
+  );
+  response.headers_mut().insert(
+    CONTENT_DISPOSITION,
+    HeaderValue::from_str(&disposition)
+      .map_err(|_| ResponseError::InternalServerError("invalid filename".to_owned()))?,
+  );
+  Ok(response)
 }
 
 async fn get_self_writeups(

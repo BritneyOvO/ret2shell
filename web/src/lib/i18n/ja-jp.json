@@ -676,6 +676,13 @@
       "filter": "チームID、名前、WPファイル名で絞り込み",
       "action": "操作",
       "download": "ダウンロード",
+      "example": {
+        "download": "WPの例をダウンロード",
+        "upload": "WPの例をアップロード",
+        "uploadSuccess": "WPの例をアップロードしました",
+        "uploadFail": "WPの例のアップロードに失敗しました",
+        "fetchFail": "WPの例の取得に失敗しました"
+      },
       "submit": {
         "title": "WPを提出",
         "hint": "PDF、DOC、DOCXのみ対応しています",

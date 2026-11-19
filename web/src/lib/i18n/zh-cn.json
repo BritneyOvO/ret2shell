@@ -676,6 +676,13 @@
       "filter": "筛选队伍 ID、名称或 WP 文件名",
       "action": "操作",
       "download": "下载",
+      "example": {
+        "download": "下载 WP 示例",
+        "upload": "上传 WP 示例",
+        "uploadSuccess": "WP 示例上传成功",
+        "uploadFail": "WP 示例上传失败",
+        "fetchFail": "获取 WP 示例失败"
+      },
       "submit": {
         "title": "提交 WP",
         "hint": "仅支持 PDF、DOC 或 DOCX 文件",

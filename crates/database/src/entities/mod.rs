@@ -23,3 +23,4 @@ pub mod user;
 pub mod user2_ip;
 pub mod user2_team;
 pub mod writeup;
+pub mod writeup_example;

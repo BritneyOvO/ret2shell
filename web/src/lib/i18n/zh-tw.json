@@ -676,6 +676,13 @@
       "filter": "篩選隊伍 ID、名稱或 WP 檔案名",
       "action": "操作",
       "download": "下載",
+      "example": {
+        "download": "下載 WP 範例",
+        "upload": "上傳 WP 範例",
+        "uploadSuccess": "WP 範例上傳成功",
+        "uploadFail": "WP 範例上傳失敗",
+        "fetchFail": "取得 WP 範例失敗"
+      },
       "submit": {
         "title": "提交 WP",
         "hint": "僅支援 PDF、DOC 或 DOCX 檔案",

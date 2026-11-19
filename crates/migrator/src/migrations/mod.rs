@@ -41,3 +41,4 @@ pub mod m_20261119_000001_game_team_name_pattern;
 pub mod m_20261119_000002_create_game_writeup;
 pub mod m_20261119_000003_game_team_name_pattern_hint;
 pub mod m_20261119_000004_writeup_latest_per_team;
+pub mod m_20261120_000001_create_game_writeup_example;
