@@ -657,6 +657,26 @@
     "rules": {
       "title": "比賽規則"
     },
+    "writeup": {
+      "title": "提交 WP",
+      "adminTitle": "WP 管理",
+      "submissions": "隊伍 WP 提交",
+      "team": "隊伍",
+      "filename": "檔案名稱",
+      "action": "操作",
+      "download": "下載",
+      "submit": {
+        "title": "提交 WP",
+        "hint": "僅支援 PDF、DOC 或 DOCX 檔案",
+        "button": "提交",
+        "previous": "最近提交：{{filename}}",
+        "success": "WP 提交成功",
+        "fail": "WP 提交失敗"
+      },
+      "errors": {
+        "fetch": "取得 WP 提交失敗"
+      }
+    },
     "scoreboard": {
       "title": "積分板",
       "empty": "暫無參賽隊伍",
@@ -814,6 +834,10 @@
       "teamNamePattern": {
         "label": "隊伍名稱格式正則",
         "placeholder": "留空表示不限制，例如 ^R2S-[A-Z]{2,8}-[0-9]{3}$"
+      },
+      "teamNamePatternHint": {
+        "label": "隊伍名稱提示",
+        "placeholder": "留空則根據隊伍名稱格式自動產生提示，支援 {{example}}"
       },
       "enableTeamAudit": {
         "label": "啟用隊伍審核",

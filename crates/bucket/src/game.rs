@@ -62,6 +62,7 @@ pub enum GameDocument {
   Readme,
   Training,
   Rules,
+  Writeup,
 }
 
 impl GameDocument {
@@ -70,6 +71,7 @@ impl GameDocument {
       Self::Readme => "README.md",
       Self::Training => "TRAINING.md",
       Self::Rules => "RULES.md",
+      Self::Writeup => "WRITEUP.md",
     }
   }
 }

@@ -694,6 +694,7 @@ async fn sync_game_config(
         host_type,
         team_size: bucket_config.team_size,
         team_name_pattern: game.team_name_pattern.clone(),
+        team_name_pattern_hint: game.team_name_pattern_hint.clone(),
         env_limit: bucket_config.env_limit.filter(|&v| v > 0),
         access_policy: game::AccessPolicy {
           sync: bucket_config.access_policy.sync,

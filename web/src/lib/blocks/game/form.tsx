@@ -30,6 +30,7 @@ export type GameForm = {
   frozen?: boolean;
   team_size?: number;
   team_name_pattern?: string;
+  team_name_pattern_hint?: string;
   env_limit?: number;
   enable_audit?: boolean;
   can_register_after_started?: boolean;
@@ -293,6 +294,18 @@ export default function GameEdit(props: { onDone: (result: GameForm) => void; ga
                 class="flex-1"
                 title={t("game.form.teamNamePattern.label")}
                 placeholder={t("game.form.teamNamePattern.placeholder")}
+              />
+            )}
+          </Field>
+          <Field name="team_name_pattern_hint">
+            {(field, props) => (
+              <Input
+                {...props}
+                value={field.value}
+                error={field.error}
+                class="flex-1"
+                title={t("game.form.teamNamePatternHint.label")}
+                placeholder={t("game.form.teamNamePatternHint.placeholder")}
               />
             )}
           </Field>

@@ -53,6 +53,8 @@ impl MigratorTrait for Migrator {
       Box::new(migrations::m_20260925_000001_challenge_milestone_unlock_limit::Migration),
       Box::new(migrations::m_20261019_000001_extra_blood_state::Migration),
       Box::new(migrations::m_20261119_000001_game_team_name_pattern::Migration),
+      Box::new(migrations::m_20261119_000002_create_game_writeup::Migration),
+      Box::new(migrations::m_20261119_000003_game_team_name_pattern_hint::Migration),
     ]
   }
 }

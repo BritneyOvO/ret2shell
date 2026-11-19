@@ -657,6 +657,26 @@
     "rules": {
       "title": "大会ルール"
     },
+    "writeup": {
+      "title": "WPを提出",
+      "adminTitle": "WP管理",
+      "submissions": "チームWP提出",
+      "team": "チーム",
+      "filename": "ファイル名",
+      "action": "操作",
+      "download": "ダウンロード",
+      "submit": {
+        "title": "WPを提出",
+        "hint": "PDF、DOC、DOCXのみ対応しています",
+        "button": "提出",
+        "previous": "最新の提出：{{filename}}",
+        "success": "WPを提出しました",
+        "fail": "WPの提出に失敗しました"
+      },
+      "errors": {
+        "fetch": "WP提出の取得に失敗しました"
+      }
+    },
     "scoreboard": {
       "title": "ポイントボード",
       "empty": "参加チームなし",
@@ -814,6 +834,10 @@
       "teamNamePattern": {
         "label": "チーム名パターン正規表現",
         "placeholder": "空欄の場合は制限なし。例 ^R2S-[A-Z]{2,8}-[0-9]{3}$"
+      },
+      "teamNamePatternHint": {
+        "label": "チーム名のヒント",
+        "placeholder": "空欄の場合はチーム名形式から自動生成します。{{example}} は例に置換されます。"
       },
       "enableTeamAudit": {
         "label": "チーム審査を有効にする",

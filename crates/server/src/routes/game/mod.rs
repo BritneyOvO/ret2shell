@@ -32,6 +32,7 @@ mod runtime;
 mod statistics;
 mod sync_error;
 mod team;
+mod writeup;
 
 pub fn router(state: &GlobalState) -> Router<GlobalState> {
   tokio::spawn(worker::game::spawn_game_workers(state.clone()));
@@ -95,6 +96,7 @@ pub fn router(state: &GlobalState) -> Router<GlobalState> {
         .route("/doc/{doc}", patch(core::update_game_doc))
         .route("/introduction", patch(core::update_game_intro_compat))
         .route("/submission", get(admin::get_submissions))
+        .route("/writeup/admin", get(writeup::get_all_writeups))
         .nest(
           "/audit",
           Router::new()
@@ -122,6 +124,7 @@ pub fn router(state: &GlobalState) -> Router<GlobalState> {
         .nest("/chat", chat::router(state))
         .route("/doc/{doc}", get(core::get_game_doc))
         .route("/introduction", get(core::redirect_game_intro_to_readme))
+        .merge(writeup::router(state))
         .route("/", get(core::get_game))
         .route_layer(middleware::from_fn_with_state(
           state.clone(),

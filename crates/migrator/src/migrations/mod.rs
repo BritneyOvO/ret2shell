@@ -38,3 +38,5 @@ pub mod m_20260924_000001_challenge_milestone_unique_name;
 pub mod m_20260925_000001_challenge_milestone_unlock_limit;
 pub mod m_20261019_000001_extra_blood_state;
 pub mod m_20261119_000001_game_team_name_pattern;
+pub mod m_20261119_000002_create_game_writeup;
+pub mod m_20261119_000003_game_team_name_pattern_hint;

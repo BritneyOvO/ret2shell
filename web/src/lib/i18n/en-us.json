@@ -657,6 +657,26 @@
     "rules": {
       "title": "Game rules"
     },
+    "writeup": {
+      "title": "Submit WP",
+      "adminTitle": "WP management",
+      "submissions": "Team WP submissions",
+      "team": "Team",
+      "filename": "Filename",
+      "action": "Action",
+      "download": "Download",
+      "submit": {
+        "title": "Submit WP",
+        "hint": "Only PDF, DOC, or DOCX files are supported",
+        "button": "Submit",
+        "previous": "Latest submission: {{filename}}",
+        "success": "WP submitted",
+        "fail": "Failed to submit WP"
+      },
+      "errors": {
+        "fetch": "Failed to fetch WP submissions"
+      }
+    },
     "scoreboard": {
       "title": "Scoreboard",
       "empty": "No participating teams yet",
@@ -814,6 +834,10 @@
       "teamNamePattern": {
         "label": "Team name pattern",
         "placeholder": "Leave empty for no restriction, for example ^R2S-[A-Z]{2,8}-[0-9]{3}$"
+      },
+      "teamNamePatternHint": {
+        "label": "Team name hint",
+        "placeholder": "Leave empty to generate a hint from the team name pattern. {{example}} is replaced with an example."
       },
       "enableTeamAudit": {
         "label": "Enable team audit",

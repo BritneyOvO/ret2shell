@@ -146,7 +146,7 @@ export function useDeleteGameMutation(props: { onSuccess?: () => void; onError?:
   }));
 }
 
-export type GameDocType = "readme" | "training" | "rules";
+export type GameDocType = "readme" | "training" | "rules" | "writeup";
 
 export async function getGameDoc(id: number, type: GameDocType) {
   return await api.get(`${api_root}/game/${id}/doc/${type}`).json<string>();

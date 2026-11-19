@@ -5,6 +5,6 @@ pub mod validation;
 pub use entities::{
   article, audit, calendar, challenge, challenge_milestone, chat, comment, config, extra, game,
   hint, institute, ip, media, notification, oauth, oauth_provider, submission, team, user,
-  user2_ip, user2_team,
+  user2_ip, user2_team, writeup,
 };
 pub use sea_orm::DbErr;

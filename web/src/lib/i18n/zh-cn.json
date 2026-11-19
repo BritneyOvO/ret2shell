@@ -657,6 +657,26 @@
     "rules": {
       "title": "比赛规则"
     },
+    "writeup": {
+      "title": "提交 WP",
+      "adminTitle": "WP 管理",
+      "submissions": "队伍 WP 提交",
+      "team": "队伍",
+      "filename": "文件名",
+      "action": "操作",
+      "download": "下载",
+      "submit": {
+        "title": "提交 WP",
+        "hint": "仅支持 PDF、DOC 或 DOCX 文件",
+        "button": "提交",
+        "previous": "最近提交：{{filename}}",
+        "success": "WP 提交成功",
+        "fail": "WP 提交失败"
+      },
+      "errors": {
+        "fetch": "获取 WP 提交失败"
+      }
+    },
     "scoreboard": {
       "title": "积分板",
       "empty": "暂无参赛队伍",
@@ -814,6 +834,10 @@
       "teamNamePattern": {
         "label": "队伍名格式正则",
         "placeholder": "留空表示不限制，例如 ^R2S-[A-Z]{2,8}-[0-9]{3}$"
+      },
+      "teamNamePatternHint": {
+        "label": "队伍名称提示",
+        "placeholder": "留空则根据队伍名称格式自动生成提示，支持 {{example}}"
       },
       "enableTeamAudit": {
         "label": "启用队伍审核",

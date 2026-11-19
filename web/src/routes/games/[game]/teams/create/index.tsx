@@ -84,6 +84,12 @@ export default function () {
     const pattern = game.data?.team_name_pattern;
     return pattern ? generateRegexExample(pattern) : null;
   });
+  const teamNameHint = createMemo(() => {
+    const configured = game.data?.team_name_pattern_hint?.trim();
+    if (configured) return configured.replaceAll("{{example}}", teamNameExample() || "");
+    if (teamNameExample()) return t("team.form.name.pattern", { example: teamNameExample() || "" });
+    return game.data?.team_name_pattern ? t("team.form.name.patternUnknown") : null;
+  });
 
   function onSubmit(data: TeamCreateForm) {
     if (!game.data) return;
@@ -176,12 +182,8 @@ export default function () {
                 />
               )}
             </Field>
-            <Show when={game.data?.team_name_pattern}>
-              <p class="text-sm opacity-60">
-                {teamNameExample()
-                  ? t("team.form.name.pattern", { example: teamNameExample() || "" })
-                  : t("team.form.name.patternUnknown")}
-              </p>
+            <Show when={teamNameHint()}>
+              <p class="text-sm opacity-60">{teamNameHint()}</p>
             </Show>
             <Field name="tag" validate={[maxLength(32, t("team.form.tag.maximumLength"))]}>
               {(field, props) => (

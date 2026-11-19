@@ -18,6 +18,8 @@ function getDocTitle(docType: GameDocType) {
       return t("training.title");
     case "rules":
       return t("game.rules.title");
+    case "writeup":
+      return t("game.writeup.title");
   }
 }
 

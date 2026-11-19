@@ -186,6 +186,12 @@ export default function () {
               </Link>
             </div>
             <ChallengeList showScore gameId={gameId()} challengeId={selectedChallengeId() ?? 0} />
+            <div class="border-t border-t-layer-content/10 p-2">
+              <Link class="w-full" ghost justify="start" href={`/games/${gameId()}/writeup`}>
+                <span class="shrink-0 icon-[fluent--document-text-20-regular] w-5 h-5 text-primary" />
+                <span>{t("game.writeup.title")}</span>
+              </Link>
+            </div>
           </div>
         )}
         showRightBar={showRightSidebar()}

@@ -65,6 +65,7 @@ pub(super) enum GameDocKind {
   Readme,
   Training,
   Rules,
+  Writeup,
 }
 
 impl GameDocKind {
@@ -73,6 +74,7 @@ impl GameDocKind {
       Self::Readme => GameDocument::Readme,
       Self::Training => GameDocument::Training,
       Self::Rules => GameDocument::Rules,
+      Self::Writeup => GameDocument::Writeup,
     }
   }
 
@@ -81,6 +83,7 @@ impl GameDocKind {
       Self::Readme => "readme",
       Self::Training => "training",
       Self::Rules => "rules",
+      Self::Writeup => "writeup",
     }
   }
 
@@ -89,12 +92,14 @@ impl GameDocKind {
       Self::Readme => ":memo: update README.md",
       Self::Training => ":memo: update TRAINING.md",
       Self::Rules => ":memo: update RULES.md",
+      Self::Writeup => ":memo: update WRITEUP.md",
     }
   }
 
   const fn default_value(self, locale: GameDocLocale) -> &'static str {
     match self {
       Self::Readme => "",
+      Self::Writeup => "",
       Self::Training => match locale {
         GameDocLocale::ZhCn => DEFAULT_GAME_TRAINING_ZH_CN,
         GameDocLocale::EnUs => DEFAULT_GAME_TRAINING_EN_US,
@@ -175,6 +180,7 @@ pub(crate) async fn invalidate_game_doc_cache(
     GameDocKind::Readme,
     GameDocKind::Training,
     GameDocKind::Rules,
+    GameDocKind::Writeup,
   ] {
     for locale in [
       GameDocLocale::ZhCn,

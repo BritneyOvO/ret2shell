@@ -94,6 +94,46 @@ impl Media {
     })
   }
 
+  /// Saves a non-image file in the same local content-addressed store.
+  pub async fn save_document(
+    &self, mut stdin: impl AsyncRead + Send + Unpin,
+  ) -> Result<media::Model, MediaError> {
+    let temp_id = nanoid::nanoid!();
+    let temp_path = self.temp_dir().join(temp_id);
+    let mut file = fs::File::create(&temp_path).await?;
+    let mut hasher = Context::new(&SHA256);
+    let mut buf = [0; 8192];
+    loop {
+      let n = stdin.read(&mut buf).await?;
+      if n == 0 {
+        break;
+      }
+      hasher.update(&buf[..n]);
+      file.write_all(&buf[..n]).await?;
+    }
+    let hash = hex::encode(hasher.finish().as_ref());
+    file.flush().await?;
+    drop(file);
+
+    fs::create_dir_all(self.path.join(&hash[..2]).join(&hash[2..4])).await?;
+    let dest = hashed_path!(self.path, &hash);
+    match fs::rename(&temp_path, &dest).await {
+      Ok(()) => {}
+      Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => {
+        let _ = fs::remove_file(&temp_path).await;
+      }
+      Err(err) => {
+        let _ = fs::remove_file(&temp_path).await;
+        return Err(err.into());
+      }
+    }
+    Ok(media::Model {
+      id: 0,
+      hash,
+      uploader_id: 0,
+    })
+  }
+
   pub async fn make_thumbnail(
     &self, hash: impl AsRef<str>, longest_edge: u32,
   ) -> Result<(), MediaError> {
