@@ -2198,7 +2198,8 @@
         "required": "Team name cannot be empty",
         "maximumLength": "Name can be at most 32 characters",
         "placeholder": "Please enter team name",
-        "pattern": "Team name must match {{pattern}}",
+        "pattern": "Team name example: {{example}}",
+        "patternUnknown": "Team name must follow the format configured for this game",
         "chuunibyouGenerator": "Chuunibyou Generator"
       },
       "institute": {

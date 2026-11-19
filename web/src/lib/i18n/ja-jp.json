@@ -2198,7 +2198,8 @@
         "required": "チーム名を入力してください",
         "maximumLength": "最大 32 文字まで",
         "placeholder": "チーム名を入力してください",
-        "pattern": "チーム名は {{pattern}} に一致する必要があります",
+        "pattern": "チーム名の例：{{example}}",
+        "patternUnknown": "チーム名は大会で設定された形式に従ってください",
         "chuunibyouGenerator": "中二病ジェネレーター"
       },
       "institute": {

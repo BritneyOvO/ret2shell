@@ -1,6 +1,7 @@
 import { useGame, useGameDoc } from "@api/game";
 import { useCreateTeamMutation } from "@api/team";
 import { generateRandomName } from "@lib/utils/random-names";
+import { generateRegexExample } from "@lib/utils/regex-example";
 import { createForm, maxLength, required, setValue } from "@modular-forms/solid";
 import { setTeamCoverStore } from "@routes/games/[game]/_blocks/team-cover";
 import { useNavigate, useParams } from "@solidjs/router";
@@ -79,6 +80,10 @@ export default function () {
 
   const submitLabel = createMemo(() => blockReason() ?? t("general.actions.create.title"));
   const submitDisabled = createMemo(() => createTeamMutation.isPending || !game.data || !!blockReason());
+  const teamNameExample = createMemo(() => {
+    const pattern = game.data?.team_name_pattern;
+    return pattern ? generateRegexExample(pattern) : null;
+  });
 
   function onSubmit(data: TeamCreateForm) {
     if (!game.data) return;
@@ -173,7 +178,9 @@ export default function () {
             </Field>
             <Show when={game.data?.team_name_pattern}>
               <p class="text-sm opacity-60">
-                {t("team.form.name.pattern", { pattern: game.data?.team_name_pattern || "" })}
+                {teamNameExample()
+                  ? t("team.form.name.pattern", { example: teamNameExample() || "" })
+                  : t("team.form.name.patternUnknown")}
               </p>
             </Show>
             <Field name="tag" validate={[maxLength(32, t("team.form.tag.maximumLength"))]}>

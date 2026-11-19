@@ -2198,7 +2198,8 @@
         "required": "队伍名称不能为空",
         "maximumLength": "名称最长 32 个字符",
         "placeholder": "请输入队伍名称",
-        "pattern": "队伍名称必须符合 {{pattern}}",
+        "pattern": "队伍名称示例：{{example}}",
+        "patternUnknown": "队伍名称需符合比赛设置的格式要求",
         "chuunibyouGenerator": "中二病生成器"
       },
       "institute": {
