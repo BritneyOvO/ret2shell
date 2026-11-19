@@ -21,8 +21,6 @@ type CreateGameForm = {
   archive_at: number;
   offline: boolean;
   team_size: number;
-  team_name_pattern?: string;
-  team_name_pattern_hint?: string;
   env_limit?: number;
   enable_audit: boolean;
   can_register_after_started: boolean;
@@ -78,8 +76,8 @@ export default function CreateGame(props: { onDone: (game: Game) => void }) {
   async function onSubmit(result: CreateGameForm) {
     const req: Game = {
       ...result,
-      team_name_pattern: result.team_name_pattern?.trim() || null,
-      team_name_pattern_hint: result.team_name_pattern_hint?.trim() || null,
+      team_name_pattern: null,
+      team_name_pattern_hint: null,
       env_limit: result.env_limit ?? null,
       start_at: DateTime.fromSeconds(result.start_at),
       end_at: DateTime.fromSeconds(result.end_at),
@@ -175,32 +173,6 @@ export default function CreateGame(props: { onDone: (game: Game) => void }) {
               class="min-w-48"
               min={1}
               max={99}
-            />
-          )}
-        </Field>
-        <Field name="team_name_pattern">
-          {(field, props) => (
-            <Input
-              icon={<span class="shrink-0 icon-[fluent--text-20-regular] w-5 h-5" />}
-              placeholder={t("game.form.teamNamePattern.placeholder")}
-              title={t("game.form.teamNamePattern.label")}
-              {...props}
-              value={field.value}
-              error={field.error}
-              class="min-w-64"
-            />
-          )}
-        </Field>
-        <Field name="team_name_pattern_hint">
-          {(field, props) => (
-            <Input
-              icon={<span class="shrink-0 icon-[fluent--text-20-regular] w-5 h-5" />}
-              placeholder={t("game.form.teamNamePatternHint.placeholder")}
-              title={t("game.form.teamNamePatternHint.label")}
-              {...props}
-              value={field.value}
-              error={field.error}
-              class="min-w-64"
             />
           )}
         </Field>

@@ -1,5 +1,7 @@
 use chrono::{DateTime, Utc, serde::ts_seconds};
-use sea_orm::{ActiveValue, IntoActiveModel, QueryFilter, QueryOrder, entity::prelude::*};
+use sea_orm::{
+  ActiveValue, IntoActiveModel, QueryFilter, QueryOrder, entity::prelude::*, sea_query::OnConflict,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
@@ -54,11 +56,22 @@ impl ActiveModelBehavior for ActiveModel {}
 pub async fn create<C>(db: &C, model: Model) -> Result<Model, DbErr>
 where
   C: ConnectionTrait, {
-  ActiveModel {
+  Entity::insert(ActiveModel {
     id: ActiveValue::NotSet,
     ..model.into_active_model().reset_all()
-  }
-  .insert(db)
+  })
+  .on_conflict(
+    OnConflict::columns([Column::GameId, Column::TeamId])
+      .update_columns([
+        Column::UserId,
+        Column::MediaHash,
+        Column::Filename,
+        Column::ContentType,
+        Column::CreatedAt,
+      ])
+      .to_owned(),
+  )
+  .exec_with_returning(db)
   .await
 }
 

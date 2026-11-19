@@ -87,19 +87,14 @@ async fn submit_writeup(
   let content_type = validate_file(&filename, field.content_type())?;
   let reader = StreamReader::new(field.map_err(std::io::Error::other));
   let stored = state.media.save_document(reader).await?;
-  if media::get_by_hash(&state.db.conn, &stored.hash)
-    .await?
-    .is_none()
-  {
-    media::create(
-      &state.db.conn,
-      media::Model {
-        uploader_id: token.id,
-        ..stored.clone()
-      },
-    )
-    .await?;
-  }
+  media::create_if_missing(
+    &state.db.conn,
+    media::Model {
+      uploader_id: token.id,
+      ..stored.clone()
+    },
+  )
+  .await?;
   let submission = writeup::create(
     &state.db.conn,
     writeup::Model {
@@ -120,7 +115,7 @@ async fn submit_writeup(
 async fn download_writeup(
   State(ref state): State<GlobalState>, Extension(game): Extension<game::Model>,
   Extension(team): Extension<Option<team::Model>>, Extension(token): Extension<Token>,
-  Path((_, writeup_id, _)): Path<(String, i64, String)>,
+  Path((_, writeup_id)): Path<(String, i64)>,
 ) -> Result<Response, ResponseError> {
   let submission = writeup::get(&state.db.conn, writeup_id)
     .await?
@@ -145,8 +140,8 @@ async fn download_writeup(
       .map_err(|_| ResponseError::InternalServerError("invalid content type".to_owned()))?,
   );
   let disposition = format!(
-    "attachment; filename=\"{}\"",
-    submission.filename.replace('"', "_")
+    "attachment; filename*=UTF-8''{}",
+    urlencoding::encode(&submission.filename)
   );
   response.headers_mut().insert(
     CONTENT_DISPOSITION,

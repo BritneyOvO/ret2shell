@@ -200,7 +200,7 @@ export const routes = {
             },
             {
               path: "/writeup",
-              component: lazy(() => import("./games/[game]/writeup/index")),
+              component: lazy(() => import("./games/[game]/challenges/index")),
             },
             {
               path: "/teams",

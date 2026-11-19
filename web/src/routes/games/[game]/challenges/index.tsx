@@ -10,7 +10,7 @@ import SidebarLayout from "@blocks/sidebar-layout";
 import type { Challenge as ChallengeModel } from "@models/challenge";
 import type { Chat } from "@models/chat";
 import { createBreakpoints } from "@solid-primitives/media";
-import { useNavigate, useParams, useSearchParams } from "@solidjs/router";
+import { useLocation, useNavigate, useParams, useSearchParams } from "@solidjs/router";
 import { accountStore } from "@storage/account";
 import { isAdminOfGame, isGameInArchived } from "@storage/game";
 import { Title } from "@storage/header";
@@ -23,12 +23,14 @@ import clsx from "clsx";
 import { DateTime } from "luxon";
 import { createEffect, createMemo, createSignal, Match, onCleanup, Show, Switch } from "solid-js";
 import { Transition } from "solid-transition-group";
+import Writeup from "../writeup/index";
 import Notifications from "./_blocks/notifications";
 import Team from "./_blocks/team";
 import Welcome from "./_blocks/welcome";
 
 export default function () {
   const navigate = useNavigate();
+  const location = useLocation();
   const params = useParams();
   const gameId = () => Number.parseInt(params.game || "UNKN0WN", 10);
 
@@ -41,6 +43,7 @@ export default function () {
   const selectedChallengeId = createMemo(() => Number.parseInt((searchParams.challenge as string) || "", 10) || null);
   const inCreate = createMemo(() => searchParams.create === "true");
   const inMilestones = createMemo(() => searchParams.milestones === "true");
+  const inWriteup = createMemo(() => location.pathname.endsWith("/writeup"));
 
   const game = useGame({ id: () => gameId(), enabled: () => !!gameId() });
   const team = useSelfTeam({
@@ -70,7 +73,7 @@ export default function () {
   });
 
   createEffect(() => {
-    if (isGameInArchived(game.data)) {
+    if (!inWriteup() && isGameInArchived(game.data)) {
       navigate(`/training/${gameId()}${location.search}`, { replace: true });
       // addToast({
       //   level: "warning",
@@ -82,7 +85,7 @@ export default function () {
   });
 
   createEffect(() => {
-    if (game.data && game.data.start_at > DateTime.now() && !isAdminOfGame(game.data)) {
+    if (!inWriteup() && game.data && game.data.start_at > DateTime.now() && !isAdminOfGame(game.data)) {
       addToast({
         level: "warning",
         description: t("game.notStarted"),
@@ -174,7 +177,10 @@ export default function () {
   const [showRightSidebar, setShowRightSidebar] = createSignal(false);
   return (
     <>
-      <Title page={t("challenge.title")} route={`/games/${gameId()}/challenges`} />
+      <Title
+        page={inWriteup() ? t("game.writeup.title") : t("challenge.title")}
+        route={`/games/${gameId()}/${inWriteup() ? "writeup" : "challenges"}`}
+      />
       <SidebarLayout
         showLeftBar={showLeftSidebar()}
         leftBar={() => (
@@ -187,7 +193,13 @@ export default function () {
             </div>
             <ChallengeList showScore gameId={gameId()} challengeId={selectedChallengeId() ?? 0} />
             <div class="border-t border-t-layer-content/10 p-2">
-              <Link class="w-full" ghost justify="start" href={`/games/${gameId()}/writeup`}>
+              <Link
+                class="w-full"
+                ghost
+                justify="start"
+                href={`/games/${gameId()}/writeup`}
+                onClick={() => setShowLeftSidebar(false)}
+              >
                 <span class="shrink-0 icon-[fluent--document-text-20-regular] w-5 h-5 text-primary" />
                 <span>{t("game.writeup.title")}</span>
               </Link>
@@ -203,8 +215,13 @@ export default function () {
         )}
       >
         <div class="flex-1 flex flex-col w-0">
-          <Tabs gameId={gameId()} challengeId={selectedChallengeId() ?? undefined} />
+          <Show when={!inWriteup()}>
+            <Tabs gameId={gameId()} challengeId={selectedChallengeId() ?? undefined} />
+          </Show>
           <Switch fallback={<Welcome />}>
+            <Match when={inWriteup()}>
+              <Writeup />
+            </Match>
             <Match when={challenge.isLoading}>
               <div class="flex-1 flex flex-row space-x-2 items-center justify-center">
                 <LoadingTips />

@@ -76,6 +76,19 @@ where
   media.insert(db).await
 }
 
+pub async fn create_if_missing<C>(db: &C, media: Model) -> Result<(), DbErr>
+where
+  C: ConnectionTrait, {
+  Entity::insert(ActiveModel {
+    id: ActiveValue::NotSet,
+    ..media.into_active_model().reset_all()
+  })
+  .on_conflict_do_nothing_on([Column::Hash])
+  .exec(db)
+  .await?;
+  Ok(())
+}
+
 pub async fn delete<C>(db: &C, id: i64) -> Result<(), DbErr>
 where
   C: ConnectionTrait, {
