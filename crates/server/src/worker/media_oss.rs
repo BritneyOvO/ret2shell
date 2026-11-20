@@ -27,7 +27,10 @@ pub async fn enqueue(state: &GlobalState, hash: &str) {
 }
 
 async fn sync_one(state: &GlobalState, hash: &str) -> anyhow::Result<()> {
-  if media::get_by_hash(&state.db.conn, hash).await?.is_none() {
+  if media::get_by_hash(&state.db.conn, hash)
+    .await?
+    .is_none_or(|model| model.private_document)
+  {
     return Ok(());
   }
   if let Some(oss) = &state.attachment_oss {
@@ -100,6 +103,7 @@ pub async fn reconcile_worker(state: GlobalState) {
     loop {
       let batch = match media::Entity::find()
         .filter(media::Column::Id.gt(last_id))
+        .filter(media::Column::PrivateDocument.eq(false))
         .order_by_asc(media::Column::Id)
         .limit(100)
         .all(&state.db.conn)

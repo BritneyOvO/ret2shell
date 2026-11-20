@@ -13,6 +13,8 @@ pub struct Model {
   pub team_id: i64,
   pub user_id: i64,
   pub media_hash: String,
+  #[serde(skip)]
+  pub storage_key: Option<String>,
   pub filename: String,
   pub content_type: String,
   #[serde(with = "ts_seconds")]
@@ -65,6 +67,7 @@ where
       .update_columns([
         Column::UserId,
         Column::MediaHash,
+        Column::StorageKey,
         Column::Filename,
         Column::ContentType,
         Column::CreatedAt,

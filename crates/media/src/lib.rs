@@ -1,4 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::{
+  io::ErrorKind,
+  path::{Path, PathBuf},
+};
 
 use r2s_database::media;
 use ring::digest::{Context, SHA256};
@@ -15,6 +18,38 @@ mod utils;
 #[derive(Clone, Debug)]
 pub struct Media {
   path: PathBuf,
+}
+
+pub struct PendingDocument {
+  path: PathBuf,
+  key: String,
+  hash: String,
+  pending: bool,
+}
+
+impl PendingDocument {
+  pub fn key(&self) -> &str {
+    &self.key
+  }
+
+  pub fn hash(&self) -> &str {
+    &self.hash
+  }
+
+  pub fn retain(mut self) {
+    self.pending = false;
+  }
+}
+
+impl Drop for PendingDocument {
+  fn drop(&mut self) {
+    if self.pending
+      && let Err(error) = std::fs::remove_file(&self.path)
+      && error.kind() != ErrorKind::NotFound
+    {
+      tracing::warn!(?error, path=?self.path, "failed to remove pending document");
+    }
+  }
 }
 
 macro_rules! hashed_path {
@@ -91,16 +126,33 @@ impl Media {
       id: 0,
       hash,
       uploader_id: 0,
+      private_document: false,
     })
   }
 
-  /// Saves a non-image file in the same local content-addressed store.
+  fn document_dir(&self) -> PathBuf {
+    self.path.join("documents")
+  }
+
+  /// Stages a private document and removes it on drop unless retained.
   pub async fn save_document(
     &self, mut stdin: impl AsyncRead + Send + Unpin,
-  ) -> Result<media::Model, MediaError> {
-    let temp_id = nanoid::nanoid!();
-    let temp_path = self.temp_dir().join(temp_id);
-    let mut file = fs::File::create(&temp_path).await?;
+  ) -> Result<PendingDocument, MediaError> {
+    let dir = self.document_dir();
+    fs::create_dir_all(&dir).await?;
+    let key = nanoid::nanoid!();
+    let path = dir.join(&key);
+    let file = std::fs::OpenOptions::new()
+      .write(true)
+      .create_new(true)
+      .open(&path)?;
+    let mut pending = PendingDocument {
+      path,
+      key,
+      hash: String::new(),
+      pending: true,
+    };
+    let mut file = File::from_std(file);
     let mut hasher = Context::new(&SHA256);
     let mut buf = [0; 8192];
     loop {
@@ -111,27 +163,21 @@ impl Media {
       hasher.update(&buf[..n]);
       file.write_all(&buf[..n]).await?;
     }
-    let hash = hex::encode(hasher.finish().as_ref());
     file.flush().await?;
-    drop(file);
+    pending.hash = hex::encode(hasher.finish().as_ref());
+    Ok(pending)
+  }
 
-    fs::create_dir_all(self.path.join(&hash[..2]).join(&hash[2..4])).await?;
-    let dest = hashed_path!(self.path, &hash);
-    match fs::rename(&temp_path, &dest).await {
-      Ok(()) => {}
-      Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => {
-        let _ = fs::remove_file(&temp_path).await;
-      }
-      Err(err) => {
-        let _ = fs::remove_file(&temp_path).await;
-        return Err(err.into());
-      }
+  pub async fn get_document(&self, key: &str) -> Result<File, MediaError> {
+    Ok(File::open(self.document_dir().join(key)).await?)
+  }
+
+  pub async fn delete_document(&self, key: &str) -> Result<(), MediaError> {
+    match fs::remove_file(self.document_dir().join(key)).await {
+      Ok(()) => Ok(()),
+      Err(error) if error.kind() == ErrorKind::NotFound => Ok(()),
+      Err(error) => Err(error.into()),
     }
-    Ok(media::Model {
-      id: 0,
-      hash,
-      uploader_id: 0,
-    })
   }
 
   pub async fn make_thumbnail(
@@ -248,5 +294,50 @@ mod tests {
     assert!(!hashed_path!(path, hash).exists());
 
     fs::remove_dir_all(path).ok();
+  }
+
+  #[tokio::test]
+  async fn document_is_private_and_kept_only_when_retained() {
+    let path = temp_path("documents");
+    let media = Media::try_open(&path).await.unwrap();
+    let bytes = b"writeup contents";
+    let pending = media.save_document(&bytes[..]).await.unwrap();
+    let key = pending.key().to_owned();
+    assert_eq!(pending.hash(), sha256(bytes));
+    assert!(media.get(pending.hash()).await.is_err());
+    drop(pending);
+    assert!(media.get_document(&key).await.is_err());
+
+    let pending = media.save_document(&bytes[..]).await.unwrap();
+    let key = pending.key().to_owned();
+    let replacement = media.save_document(&bytes[..]).await.unwrap();
+    assert_ne!(key, replacement.key());
+    pending.retain();
+    assert!(media.get_document(&key).await.is_ok());
+    media.delete_document(&key).await.unwrap();
+    assert!(media.get_document(&key).await.is_err());
+    assert!(media.get_document(replacement.key()).await.is_ok());
+    drop(replacement);
+    fs::remove_dir_all(path).unwrap();
+  }
+
+  #[tokio::test]
+  async fn failed_document_read_removes_partial_file() {
+    use std::{io, pin::Pin, task::Poll};
+
+    let path = temp_path("interrupted-document");
+    let media = Media::try_open(&path).await.unwrap();
+    struct Interrupted;
+    impl tokio::io::AsyncRead for Interrupted {
+      fn poll_read(
+        self: Pin<&mut Self>, _: &mut std::task::Context<'_>, _: &mut tokio::io::ReadBuf<'_>,
+      ) -> Poll<io::Result<()>> {
+        Poll::Ready(Err(io::Error::other("upload interrupted")))
+      }
+    }
+    let reader = tokio::io::AsyncReadExt::chain(&b"partial writeup"[..], Interrupted);
+    assert!(media.save_document(reader).await.is_err());
+    assert!(fs::read_dir(media.document_dir()).unwrap().next().is_none());
+    fs::remove_dir_all(path).unwrap();
   }
 }

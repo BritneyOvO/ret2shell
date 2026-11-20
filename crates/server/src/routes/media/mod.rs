@@ -53,10 +53,16 @@ async fn get_media(
     return Err(ResponseError::Forbidden("origin is not allowed".to_owned()));
   }
   let model = media::get_by_hash(&state.db.conn, &query.hash).await?;
-  if model.is_none() {
+  if model.is_none_or(|model| model.private_document) {
     return Err(ResponseError::NotFound("media".to_string()));
   }
-  let mime = state.media.get_mime_type(&query.hash)?;
+  let mime = match state.media.get_mime_type(&query.hash) {
+    Ok(mime) if state.media.is_image(&mime) => mime,
+    Ok(_) | Err(r2s_media::MediaError::UnsupportedFileType(_)) => {
+      return Err(ResponseError::NotFound("media".to_string()));
+    }
+    Err(error) => return Err(error.into()),
+  };
   if let Some(oss) = &state.attachment_oss
     && oss.media_enabled()
     && mime != "image/svg+xml"

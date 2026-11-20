@@ -11,6 +11,8 @@ pub struct Model {
   #[sea_orm(unique)]
   pub hash: String,
   pub uploader_id: i64,
+  #[serde(skip)]
+  pub private_document: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -74,19 +76,6 @@ where
     ..media.into_active_model().reset_all()
   };
   media.insert(db).await
-}
-
-pub async fn create_if_missing<C>(db: &C, media: Model) -> Result<(), DbErr>
-where
-  C: ConnectionTrait, {
-  Entity::insert(ActiveModel {
-    id: ActiveValue::NotSet,
-    ..media.into_active_model().reset_all()
-  })
-  .on_conflict_do_nothing_on([Column::Hash])
-  .exec(db)
-  .await?;
-  Ok(())
 }
 
 pub async fn delete<C>(db: &C, id: i64) -> Result<(), DbErr>

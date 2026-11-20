@@ -61,7 +61,11 @@ impl AttachmentOss {
 
   pub async fn sync_media(&self, media: &r2s_media::Media, hash: &str) -> anyhow::Result<()> {
     let key = Self::media_key(hash)?;
-    let mime = media.get_mime_type(hash)?;
+    let mime = match media.get_mime_type(hash) {
+      Ok(mime) if media.is_image(&mime) => mime,
+      Ok(_) | Err(r2s_media::MediaError::UnsupportedFileType(_)) => return Ok(()),
+      Err(error) => return Err(error.into()),
+    };
     if mime == "image/svg+xml" || self.operator.exists(&key).await? {
       return Ok(());
     }

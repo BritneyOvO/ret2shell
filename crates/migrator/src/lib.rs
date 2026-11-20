@@ -57,6 +57,7 @@ impl MigratorTrait for Migrator {
       Box::new(migrations::m_20261119_000003_game_team_name_pattern_hint::Migration),
       Box::new(migrations::m_20261119_000004_writeup_latest_per_team::Migration),
       Box::new(migrations::m_20261120_000001_create_game_writeup_example::Migration),
+      Box::new(migrations::m_20261120_000002_private_writeup_storage::Migration),
     ]
   }
 }
