@@ -1,4 +1,14 @@
 const ESCAPED_LITERAL = /[\\^$.*+?()[\]{}|]/;
+const MAX_TEAM_NAME_LENGTH = 32;
+
+function javascriptPattern(pattern: string): string {
+  return pattern.replace(/\\(?:\\|A|z|p\{Han\})/g, (sequence) => {
+    if (sequence === "\\A") return "^";
+    if (sequence === "\\z") return "$(?![\\s\\S])";
+    if (sequence === "\\p{Han}") return "\\p{Script=Han}";
+    return sequence;
+  });
+}
 
 function findClosingGroup(source: string, start: number): number {
   let depth = 0;
@@ -57,7 +67,15 @@ function findTopLevelAlternative(source: string): number {
 }
 
 function classExample(source: string): string {
-  const content = source.startsWith("^") ? source.slice(1) : source;
+  if (source.startsWith("^")) {
+    try {
+      const matcher = new RegExp(javascriptPattern(`[${source}]`), "u");
+      return [..."aA0_- bB1张é"].find((candidate) => matcher.test(candidate)) ?? "";
+    } catch {
+      return "";
+    }
+  }
+  const content = source;
   if (content.includes("\\p{Han}") || content.includes("\\p{sc=Han}")) return "张";
   if (content.includes("\\d") || content.includes("0-9")) return "0";
   if (content.includes("A-Z")) return "A";
@@ -95,12 +113,12 @@ function atomExample(source: string, start: number): { value: string; next: numb
       return { value: "", next: end + 1 };
     const alternative = findTopLevelAlternative(content);
     if (alternative >= 0) content = content.slice(0, alternative);
-    return { value: generateRegexExample(content) || "", next: end + 1 };
+    return { value: generateCandidate(content) ?? "", next: end + 1 };
   }
 
   if (char === "\\") {
-    const escapeEnd =
-      source[start + 1] === "p" && source[start + 2] === "{" ? source.indexOf("}", start + 3) + 1 : start + 2;
+    const propertyEnd = source[start + 1] === "p" && source[start + 2] === "{" ? source.indexOf("}", start + 3) : -1;
+    const escapeEnd = propertyEnd >= 0 ? propertyEnd + 1 : start + 2;
     const escapeSequence = source.slice(start, escapeEnd);
     if (escapeSequence === "\\d") return { value: "0", next: escapeEnd };
     if (escapeSequence === "\\w") return { value: "a", next: escapeEnd };
@@ -128,12 +146,12 @@ function applyQuantifier(source: string, start: number, value: string): { value:
   if (end < 0) return { value, next: start };
   const match = source.slice(start + 1, end).match(/^(\d+)(?:,\d*)?$/);
   if (!match) return { value, next: start };
-  const count = Math.max(Number.parseInt(match[1], 10), 1);
+  const count = Math.min(Number.parseInt(match[1], 10), MAX_TEAM_NAME_LENGTH + 1);
   return { value: value.repeat(count), next: end + 1 };
 }
 
-export function generateRegexExample(pattern: string): string | null {
-  let source = pattern.trim();
+function generateCandidate(pattern: string): string | null {
+  let source = pattern;
   if (!source) return null;
   if (source.startsWith("^") || source.startsWith("\\A")) source = source.replace(/^(?:\^|\\A)/, "");
   if (source.endsWith("$") || source.endsWith("\\z")) source = source.replace(/(?:\$|\\z)$/, "");
@@ -147,8 +165,21 @@ export function generateRegexExample(pattern: string): string | null {
     index = atom.next;
     const quantified = applyQuantifier(source, index, atom.value);
     result += quantified.value;
+    if (result.length > MAX_TEAM_NAME_LENGTH) return null;
     index = quantified.next;
   }
 
   return result || null;
+}
+
+export function generateRegexExample(pattern: string): string | null {
+  if (pattern.length > 256) return null;
+  const candidate = generateCandidate(pattern);
+  if (!candidate?.trim()) return null;
+  try {
+    const matcher = new RegExp(`^(?:${javascriptPattern(pattern)})$(?![\\s\\S])`, "u");
+    return matcher.test(candidate) ? candidate : null;
+  } catch {
+    return null;
+  }
 }

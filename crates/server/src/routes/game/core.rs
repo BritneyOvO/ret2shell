@@ -54,6 +54,7 @@ fn validate_team_name_pattern(game: &game::Model) -> Result<(), ResponseError> {
       ));
     }
     Regex::new(pattern)
+      .and_then(|_| super::team::name_pattern(pattern))
       .map_err(|error| ResponseError::BadRequest(format!("invalid team name pattern: {error}")))?;
   }
   Ok(())

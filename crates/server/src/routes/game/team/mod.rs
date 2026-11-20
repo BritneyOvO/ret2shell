@@ -82,17 +82,21 @@ fn ensure_team_in_game(game: &game::Model, team: &team::Model) -> Result<(), Res
   Ok(())
 }
 
+pub(super) fn name_pattern(pattern: &str) -> Result<Regex, regex::Error> {
+  Regex::new(&format!(r"\A(?:{pattern})\z")).or_else(|_| {
+    // A trailing comment in verbose mode can consume the closing group.
+    Regex::new(&format!("\\A(?:{pattern}\n)\\z"))
+  })
+}
+
 fn validate_team_name(game: &game::Model, name: &str) -> Result<(), ResponseError> {
   let Some(pattern) = game.team_name_pattern.as_deref() else {
     return Ok(());
   };
-  let regex = Regex::new(pattern).map_err(|error| {
+  let regex = name_pattern(pattern).map_err(|error| {
     ResponseError::InternalServerError(format!("invalid team name pattern: {error}"))
   })?;
-  let matches_entire_name = regex
-    .find(name)
-    .is_some_and(|matched| matched.start() == 0 && matched.end() == name.len());
-  if !matches_entire_name {
+  if !regex.is_match(name) {
     return Err(ResponseError::PreconditionFailed(format!(
       "team name does not match the required format: {pattern}"
     )));
@@ -625,4 +629,25 @@ async fn query_team_by_token(
     team.into()
   };
   Ok(Json(result))
+}
+
+#[cfg(test)]
+mod tests {
+  use super::name_pattern;
+
+  #[test]
+  fn name_pattern_matches_the_entire_name() {
+    let regex = name_pattern("A|AB").unwrap();
+    assert!(regex.is_match("A"));
+    assert!(regex.is_match("AB"));
+    assert!(!regex.is_match("ABC"));
+    assert!(!regex.is_match("xAB"));
+  }
+
+  #[test]
+  fn name_pattern_accepts_verbose_patterns_with_trailing_comments() {
+    let regex = name_pattern("(?x) A|AB # team names").unwrap();
+    assert!(regex.is_match("AB"));
+    assert!(!regex.is_match("AB\n"));
+  }
 }
