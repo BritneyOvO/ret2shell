@@ -686,7 +686,7 @@
       "submit": {
         "title": "WPを提出",
         "hint": "PDF、DOC、DOCXのみ対応しています",
-        "button": "提出",
+        "selectFile": "WPファイルを選択",
         "previous": "最新の提出：{{filename}}",
         "success": "WPを提出しました",
         "fail": "WPの提出に失敗しました"

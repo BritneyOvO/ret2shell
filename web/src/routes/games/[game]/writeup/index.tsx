@@ -149,21 +149,17 @@ export default function () {
           </Show>
           <Button
             type="button"
-            square
-            title={t("general.actions.select.title")}
-            aria-label={t("general.actions.select.title")}
+            class="max-w-full"
+            title={file()?.name ?? t("game.writeup.submit.selectFile")}
             disabled={submit.isPending}
             onClick={() => fileInput?.click()}
           >
             <span class="shrink-0 icon-[fluent--document-20-regular] w-5 h-5" />
+            <span class="min-w-0 truncate">{file()?.name ?? t("game.writeup.submit.selectFile")}</span>
           </Button>
-          <Show when={file()}>{(selected) => <span class="min-w-0 break-all text-sm">{selected().name}</span>}</Show>
           <Button
             type="button"
             level="primary"
-            square
-            title={t("game.writeup.submit.button")}
-            aria-label={t("game.writeup.submit.button")}
             disabled={!team.data || !file() || submit.isPending}
             loading={submit.isPending}
             onClick={() => {
@@ -172,6 +168,7 @@ export default function () {
             }}
           >
             <span class="shrink-0 icon-[fluent--arrow-upload-20-regular] w-5 h-5" />
+            <span>{t("game.writeup.submit.title")}</span>
           </Button>
         </div>
         <Show when={team.error instanceof HTTPError && team.error.response.status === 404}>

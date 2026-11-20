@@ -686,7 +686,7 @@
       "submit": {
         "title": "Submit WP",
         "hint": "Only PDF, DOC, or DOCX files are supported",
-        "button": "Submit",
+        "selectFile": "Choose WP file",
         "previous": "Latest submission: {{filename}}",
         "success": "WP submitted",
         "fail": "Failed to submit WP"

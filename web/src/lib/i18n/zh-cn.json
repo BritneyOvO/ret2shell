@@ -686,7 +686,7 @@
       "submit": {
         "title": "提交 WP",
         "hint": "仅支持 PDF、DOC 或 DOCX 文件",
-        "button": "提交",
+        "selectFile": "选择 WP 文件",
         "previous": "最近提交：{{filename}}",
         "success": "WP 提交成功",
         "fail": "WP 提交失败"
